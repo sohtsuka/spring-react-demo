@@ -1,0 +1,8 @@
+spring:
+  flyway:
+    locations: classpath:db/migration
+
+logging:
+  level:
+    root: WARN
+    com.example.app: INFO

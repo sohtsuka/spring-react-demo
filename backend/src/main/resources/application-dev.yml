@@ -1,0 +1,23 @@
+spring:
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/testdata
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/appdb}
+    username: ${DB_USERNAME:appuser}
+    password: ${DB_PASSWORD:apppassword}
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false  # 開発環境は HTTP のため false
+
+logging:
+  level:
+    root: INFO
+    com.example.app: DEBUG
+    org.springframework.security: DEBUG
+    org.mybatis: DEBUG
