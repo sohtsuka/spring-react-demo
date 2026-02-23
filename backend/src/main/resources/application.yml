@@ -20,6 +20,10 @@ mybatis:
     default-fetch-size: 100
     default-statement-timeout: 30
 
+app:
+  security:
+    pepper: ${APP_PEPPER}
+
 server:
   port: 8080
   servlet:

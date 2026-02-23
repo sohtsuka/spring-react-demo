@@ -85,3 +85,18 @@ test {
     useJUnitPlatform()
     finalizedBy jacocoTestReport
 }
+
+// パスワードの Argon2id ハッシュを生成するタスク
+// 使い方: ./gradlew hashPassword -Ppassword=<パスワード> -Ppepper=<ペッパー>
+tasks.register('hashPassword', JavaExec) {
+    dependsOn compileJava
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.example.app.util.PasswordHasher'
+    doFirst {
+        def password = project.findProperty('password')?.toString()
+        if (!password) {
+            throw new RuntimeException("-Ppassword=<パスワード> を指定してください")
+        }
+        args = [password, project.findProperty('pepper')?.toString() ?: '']
+    }
+}

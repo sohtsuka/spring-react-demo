@@ -1,3 +1,7 @@
+app:
+  security:
+    pepper: dev-pepper-change-in-production
+
 spring:
   flyway:
     locations:

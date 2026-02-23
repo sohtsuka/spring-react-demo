@@ -17,6 +17,8 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import com.example.app.security.PepperPasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -37,6 +39,9 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
     // Spring Boot 4 の初期化順序問題を避けるため ObjectMapper をインジェクションせず直接生成
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${app.security.pepper}")
+    private String pepper;
 
     public SecurityConfig(UserDetailsService userDetailsService) {
         this.userDetailsService = userDetailsService;
@@ -121,6 +126,7 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         // Argon2id: saltLength=16, hashLength=32, parallelism=1, memory=65536, iterations=3
-        return new Argon2PasswordEncoder(16, 32, 1, 65536, 3);
+        Argon2PasswordEncoder argon2 = new Argon2PasswordEncoder(16, 32, 1, 65536, 3);
+        return new PepperPasswordEncoder(argon2, pepper);
     }
 }
