@@ -136,9 +136,11 @@ function useToast() {
     listeners.push(setState)
     return () => {
       const index = listeners.indexOf(setState)
+      /* v8 ignore start */
       if (index > -1) {
         listeners.splice(index, 1)
       }
+      /* v8 ignore stop */
     }
   }, [state])
 

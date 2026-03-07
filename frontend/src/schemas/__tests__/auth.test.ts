@@ -39,4 +39,15 @@ describe('loginSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  it('ユーザー名が 51 文字以上の場合はエラー', () => {
+    const result = loginSchema.safeParse({
+      username: 'a'.repeat(51),
+      password: 'password123',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]?.path).toContain('username')
+    }
+  })
 })

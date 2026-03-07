@@ -7,7 +7,7 @@ function getCookieValue(name: string): string | null {
   const match = document.cookie
     .split('; ')
     .find((row) => row.startsWith(`${name}=`))
-  return match ? decodeURIComponent(match.split('=')[1] ?? '') : null
+  return match ? decodeURIComponent(match.substring(name.length + 1)) : null
 }
 
 const api = axios.create({
@@ -20,7 +20,7 @@ const api = axios.create({
 
 // リクエストインターセプター: CSRF トークンを付与
 api.interceptors.request.use((config) => {
-  if (!['get', 'head', 'options', 'trace'].includes(config.method ?? '')) {
+  if (!['get', 'head', 'options', 'trace'].includes(config.method!)) {
     const csrfToken = getCookieValue('XSRF-TOKEN')
     if (csrfToken) {
       config.headers['X-CSRF-TOKEN'] = csrfToken
