@@ -64,6 +64,7 @@ public class SecurityConfig {
             .addFilterAfter(new CsrfCookieFilter(), org.springframework.security.web.csrf.CsrfFilter.class)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/login").permitAll()
+                .requestMatchers("/api/v1/users/**").hasAnyRole("ADMIN", "MANAGER")
                 .anyRequest().authenticated())
             .sessionManagement(session -> session
                 .sessionFixation().newSession()

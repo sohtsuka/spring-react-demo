@@ -23,9 +23,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
 
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -95,9 +101,72 @@ class AuthControllerTest {
     }
 
     @Test
-    void logout_returns204() throws Exception {
+    void login_withLockedAccount_returns401() throws Exception {
+        given(authenticationManager.authenticate(any())).willThrow(new LockedException("locked"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest("admin", "Password1!"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));
+    }
+
+    @Test
+    void login_withDisabledAccount_returns401() throws Exception {
+        given(authenticationManager.authenticate(any())).willThrow(new DisabledException("disabled"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest("admin", "Password1!"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_DISABLED"));
+    }
+
+    @Test
+    void login_withExistingSession_invalidatesOldSession() throws Exception {
+        User user = buildUser();
+        CustomUserDetails userDetails = new CustomUserDetails(user);
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                userDetails, null, userDetails.getAuthorities());
+        given(authenticationManager.authenticate(any())).willReturn(auth);
+
+        MockHttpSession existingSession = new MockHttpSession();
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .session(existingSession)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest("admin", "Password1!"))))
+                .andExpect(status().isOk());
+
+        assertThat(existingSession.isInvalid()).isTrue();
+    }
+
+    @Test
+    void logout_withSession_invalidatesSession() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+
+        mockMvc.perform(post("/api/v1/auth/logout").session(session))
+                .andExpect(status().isNoContent());
+
+        assertThat(session.isInvalid()).isTrue();
+    }
+
+    @Test
+    void logout_withoutSession_returns204() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void me_authenticated_returnsCurrentUser() throws Exception {
+        User user = buildUser();
+        CustomUserDetails userDetails = new CustomUserDetails(user);
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                userDetails, null, userDetails.getAuthorities());
+
+        mockMvc.perform(get("/api/v1/auth/me").principal(auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.username").value("admin"))
+                .andExpect(jsonPath("$.data.role").value("ADMIN"));
     }
 
     private User buildUser() {

@@ -183,6 +183,108 @@ class UserServiceTest {
         then(userRepository).should().resetFailedLoginAttempts("testuser");
     }
 
+    // --- update ブランチ ---
+
+    @Test
+    void update_notFound_throwsAppException() {
+        given(userRepository.findById(99L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.update(99L, new UpdateUserRequest(null, null, null, null)))
+                .isInstanceOf(AppException.class)
+                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                        .isEqualTo(ErrorCode.USER_NOT_FOUND));
+    }
+
+    @Test
+    void update_withSameUsername_skipsExistenceCheck() {
+        User user = buildUser(); // username = "testuser"
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        userService.update(1L, new UpdateUserRequest("testuser", null, null, null));
+
+        then(userRepository).should(org.mockito.Mockito.never()).existsByUsername(any());
+    }
+
+    @Test
+    void update_withNewUsername_duplicate_throwsAppException() {
+        User user = buildUser();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(userRepository.existsByUsername("other")).willReturn(true);
+
+        assertThatThrownBy(() -> userService.update(1L, new UpdateUserRequest("other", null, null, null)))
+                .isInstanceOf(AppException.class)
+                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                        .isEqualTo(ErrorCode.USERNAME_ALREADY_EXISTS));
+    }
+
+    @Test
+    void update_withNewUsername_notDuplicate_updatesUsername() {
+        User user = buildUser();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(userRepository.existsByUsername("newname")).willReturn(false);
+
+        userService.update(1L, new UpdateUserRequest("newname", null, null, null));
+
+        assertThat(user.getUsername()).isEqualTo("newname");
+        then(userRepository).should().update(user);
+    }
+
+    @Test
+    void update_withSameEmail_skipsExistenceCheck() {
+        User user = buildUser(); // email = "test@example.com"
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        userService.update(1L, new UpdateUserRequest(null, "test@example.com", null, null));
+
+        then(userRepository).should(org.mockito.Mockito.never()).existsByEmail(any());
+    }
+
+    @Test
+    void update_withNewEmail_duplicate_throwsAppException() {
+        User user = buildUser();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(userRepository.existsByEmail("other@example.com")).willReturn(true);
+
+        assertThatThrownBy(() -> userService.update(1L, new UpdateUserRequest(null, "other@example.com", null, null)))
+                .isInstanceOf(AppException.class)
+                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                        .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS));
+    }
+
+    @Test
+    void update_withNewEmail_notDuplicate_updatesEmail() {
+        User user = buildUser();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(userRepository.existsByEmail("new@example.com")).willReturn(false);
+
+        userService.update(1L, new UpdateUserRequest(null, "new@example.com", null, null));
+
+        assertThat(user.getEmail()).isEqualTo("new@example.com");
+        then(userRepository).should().update(user);
+    }
+
+    @Test
+    void update_withEnabledField_setsEnabled() {
+        User user = buildUser();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        userService.update(1L, new UpdateUserRequest(null, null, null, false));
+
+        assertThat(user.isEnabled()).isFalse();
+        then(userRepository).should().update(user);
+    }
+
+    // --- recordLoginFailure ブランチ ---
+
+    @Test
+    void recordLoginFailure_userNotFound_doesNothing() {
+        given(userRepository.findByUsername("unknown")).willReturn(Optional.empty());
+
+        userService.recordLoginFailure("unknown");
+
+        then(userRepository).should(org.mockito.Mockito.never()).incrementFailedLoginAttempts(anyString());
+    }
+
     private User buildUser() {
         User user = new User();
         user.setId(1L);
