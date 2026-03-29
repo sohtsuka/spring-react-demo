@@ -26,8 +26,8 @@ repositories {
 }
 
 dependencies {
-    implementation platform(libs.spring.boot.bom.v4004)
-    testImplementation platform(libs.testcontainers.bom.v20)
+    implementation platform(libs.spring.boot.bom)
+    testImplementation platform(libs.testcontainers.bom)
 
     // Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter-web'
