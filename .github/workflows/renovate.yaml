@@ -21,3 +21,6 @@ jobs:
           token: ${{ secrets.RENOVATE_TOKEN }}
           configurationFile: renovate.json
           renovate-version: 43.99.0@sha256:aae697086b93427dcde46eb92e08e334b018946ce19339bf044ce971ca1626e2
+        env:
+          # Explicitly target this repository to avoid "No repositories found" in self-hosted mode.
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
