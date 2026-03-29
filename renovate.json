@@ -1,0 +1,9 @@
+{
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "matchManagers": ["gradle", "gradle-wrapper"],
+      "minimumReleaseAge": "7 days"
+    }
+  ]
+}

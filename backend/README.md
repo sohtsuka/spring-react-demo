@@ -110,6 +110,12 @@ curl -b cookies.txt -X POST http://localhost:8080/api/v1/logout \
 
 ### 脆弱性スキャン
 
+事前に [NVD](https://nvd.nist.gov/developers/request-an-api-key) でAPIキーを申請し、発行された値を環境変数にセットする。
+
+```bash
+export NVD_API_KEY={NVD APIキー}
+```
+
 ```bash
 ./gradlew dependencyCheckAnalyze
 ```
@@ -137,3 +143,18 @@ curl -b cookies.txt -X POST http://localhost:8080/api/v1/logout \
 |---|---|
 | `dev` (デフォルト) | 詳細ログ有効、`db/testdata/` の初期データも投入 |
 | `test` | テスト実行時に自動適用 (Testcontainers 使用) |
+
+---
+
+## 依存関係管理 (Dependency Locking / Version Catalog / Renovate)
+
+- Gradle dependency locking を有効化しています。依存更新後は lockfile を更新してください。
+- lock 更新コマンド:
+
+```bash
+./gradlew dependencies --write-locks
+```
+
+- Version Catalog は `gradle/libs.versions.toml` で管理しています。
+- BOM は Version Catalog 経由で選択できます（例: `libs.spring.boot.bom.v4003` / `libs.spring.boot.bom.v4002`、`libs.testcontainers.bom.v20` / `libs.testcontainers.bom.v19`）。
+- Renovate はリポジトリルートの `renovate.json` で管理し、Gradle 関連更新には `minimumReleaseAge: 7 days` を適用しています。

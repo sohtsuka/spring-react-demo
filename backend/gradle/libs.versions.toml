@@ -1,0 +1,25 @@
+[versions]
+springBoot4004 = "4.0.4"
+springBoot4003 = "4.0.3"
+springBoot4002 = "4.0.2"
+mybatisSpringBoot = "4.0.1"
+bucket4j = "8.16.1"
+bouncyCastle = "1.83"
+testcontainers20 = "2.0.3"
+testcontainers19 = "1.20.6"
+
+[libraries]
+spring-boot-bom-v4004 = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot4004" }
+spring-boot-bom-v4003 = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot4003" }
+spring-boot-bom-v4002 = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot4002" }
+mybatis-spring-boot-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter", version.ref = "mybatisSpringBoot" }
+mybatis-spring-boot-starter-test = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter-test", version.ref = "mybatisSpringBoot" }
+bucket4j-jdk17-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bucket4j" }
+bcprov-jdk18on = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncyCastle" }
+testcontainers-bom-v20 = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers20" }
+testcontainers-bom-v19 = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers19" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
+
+[bundles]
+testcontainers = ["testcontainers-junit-jupiter", "testcontainers-postgresql"]
