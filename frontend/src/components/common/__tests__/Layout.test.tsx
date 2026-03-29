@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import type { AuthUser } from '@/types'
 import { Layout } from '../Layout'
@@ -24,7 +24,7 @@ function makeAuthReturn(overrides: Partial<ReturnType<typeof useAuth>>) {
   }
 }
 
-function renderLayout(initialEntry = '/', user?: AuthUser) {
+function renderLayout(initialEntry = '/') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
