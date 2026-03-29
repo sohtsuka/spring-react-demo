@@ -15,18 +15,27 @@ java {
     }
 }
 
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
+    implementation platform(libs.spring.boot.bom.v4003)
+    testImplementation platform(libs.testcontainers.bom.v20)
+
     // Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     // MyBatis
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.1'
+    implementation libs.mybatis.spring.boot.starter
 
     // Database
     implementation 'org.springframework.boot:spring-boot-starter-jdbc'
@@ -37,23 +46,16 @@ dependencies {
     implementation 'org.flywaydb:flyway-database-postgresql'
 
     // Bucket4j (rate limiting) - Java 17+ artifact (8.11+ で artifact 名が変更)
-    implementation 'com.bucket4j:bucket4j_jdk17-core:8.16.1'
+    implementation libs.bucket4j.jdk17.core
 
     // Bouncy Castle for Argon2
-    implementation 'org.bouncycastle:bcprov-jdk18on:1.83'
+    implementation libs.bcprov.jdk18on
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.0.1'
-    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
-    testImplementation 'org.testcontainers:testcontainers-postgresql'
-}
-
-dependencyManagement {
-    imports {
-        mavenBom "org.testcontainers:testcontainers-bom:2.0.3"
-    }
+    testImplementation libs.mybatis.spring.boot.starter.test
+    testImplementation libs.bundles.testcontainers
 }
 
 jacoco {
