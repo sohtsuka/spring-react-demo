@@ -110,6 +110,12 @@ curl -b cookies.txt -X POST http://localhost:8080/api/v1/logout \
 
 ### 脆弱性スキャン
 
+事前に [NVD](https://nvd.nist.gov/developers/request-an-api-key) でAPIキーを申請し、発行された値を環境変数にセットする。
+
+```bash
+export NVD_API_KEY={NVD APIキー}
+```
+
 ```bash
 ./gradlew dependencyCheckAnalyze
 ```
