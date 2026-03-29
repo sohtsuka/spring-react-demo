@@ -3,9 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Toaster } from '@/components/ui/toaster'
-import { mockDisabledUser, mockUser } from '@/test/mockUser'
+import { mockDisabledUser } from '@/test/mockUser'
 import { server } from '@/test/server'
 import { createTestQueryClient } from '@/test/renderWithProviders'
 import { AdminPage } from '../AdminPage'
@@ -23,6 +23,10 @@ function renderAdminPage() {
 }
 
 describe('AdminPage', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('ローディング中はスピナーを表示する', () => {
     server.use(
       http.get('/api/v1/users', async () => {
@@ -81,7 +85,6 @@ describe('AdminPage', () => {
 
   it('削除確認: OK → deleteUser が呼ばれる', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const deleteSpy = vi.fn().mockResolvedValue(undefined)
     server.use(http.delete('/api/v1/users/:id', () => new HttpResponse(null, { status: 204 })))
     renderAdminPage()
     await waitFor(() => expect(screen.getByText('testuser')).toBeInTheDocument())

@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosHeaders } from 'axios'
+import { AxiosError, AxiosHeaders } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { queryClient } from '../queryClient'
 

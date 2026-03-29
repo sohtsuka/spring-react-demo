@@ -1,4 +1,6 @@
-ignoredBuiltDependencies:
-  - esbuild
-
+# リリース後にインストールまで様子を見る期間 (7日)
 minimumReleaseAge: 10080
+
+onlyBuiltDependencies:
+  - esbuild
+  - msw
