@@ -3,7 +3,7 @@ springBoot = "4.0.4"
 mybatisSpringBoot = "4.0.1"
 bucket4j = "8.16.1"
 bouncyCastle = "1.83"
-testcontainers = "2.0.3"
+testcontainers = "2.0.4"
 
 [libraries]
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
