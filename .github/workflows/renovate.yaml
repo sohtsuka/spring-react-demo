@@ -24,3 +24,5 @@ jobs:
         env:
           # Explicitly target this repository to avoid "No repositories found" in self-hosted mode.
           RENOVATE_REPOSITORIES: ${{ github.repository }}
+          # Allow Gradle wrapper execution for lockfile/wrapper artifact updates.
+          RENOVATE_ALLOWED_UNSAFE_EXECUTIONS: '["gradleWrapper"]'
