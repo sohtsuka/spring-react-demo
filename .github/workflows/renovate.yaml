@@ -5,6 +5,11 @@ on:
 
 jobs:
   renovate:
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      statuses: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
