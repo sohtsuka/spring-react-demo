@@ -11,7 +11,7 @@ describe('cn', () => {
   })
 
   it('falsy 値を無視する', () => {
-    expect(cn('foo', false && 'bar', undefined, null, 'baz')).toBe('foo baz')
+    expect(cn('foo', false, undefined, null, 'baz')).toBe('foo baz')
   })
 
   it('条件付きクラスを扱える', () => {

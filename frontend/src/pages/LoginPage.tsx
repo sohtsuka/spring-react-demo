@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router'
 import { zodResolver } from '@hookform/resolvers/zod'
-import axios from 'axios'
+import { HttpError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -39,8 +39,8 @@ export function LoginPage() {
     try {
       await loginAsync(data)
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status
+      if (error instanceof HttpError) {
+        const status = error.status
         if (status === 401) {
           setError('root', {
             message: 'ユーザー名またはパスワードが正しくありません',

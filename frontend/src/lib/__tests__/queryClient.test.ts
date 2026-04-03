@@ -1,19 +1,13 @@
-import { AxiosError, AxiosHeaders } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { HttpError } from '../api'
 import { queryClient } from '../queryClient'
 
 // QueryCache の onError コールバックを直接取得して呼び出す
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getOnError = (): ((error: unknown) => void) => (queryClient.getQueryCache() as any).config.onError
 
-function makeAxiosError(status: number): AxiosError {
-  return new AxiosError(
-    'Request failed',
-    String(status),
-    undefined,
-    undefined,
-    { status, data: {}, headers: new AxiosHeaders(), config: { headers: new AxiosHeaders() }, statusText: '' } as never,
-  )
+function makeHttpError(status: number): HttpError {
+  return new HttpError(status, 'Error')
 }
 
 let href = ''
@@ -38,24 +32,24 @@ afterEach(() => {
 })
 
 describe('queryClient onError', () => {
-  it('Axios エラー + 401 + /login 以外のパス → /login にリダイレクト', () => {
+  it('HttpError + 401 + /login 以外のパス → /login にリダイレクト', () => {
     pathname = '/dashboard'
-    getOnError()(makeAxiosError(401))
+    getOnError()(makeHttpError(401))
     expect(href).toBe('/login')
   })
 
-  it('Axios エラー + 401 + /login パス → リダイレクトしない', () => {
+  it('HttpError + 401 + /login パス → リダイレクトしない', () => {
     pathname = '/login'
-    getOnError()(makeAxiosError(401))
+    getOnError()(makeHttpError(401))
     expect(href).toBe('')
   })
 
-  it('Axios エラー + 非 401 (500) → リダイレクトしない', () => {
-    getOnError()(makeAxiosError(500))
+  it('HttpError + 非 401 (500) → リダイレクトしない', () => {
+    getOnError()(makeHttpError(500))
     expect(href).toBe('')
   })
 
-  it('非 Axios エラー → リダイレクトしない', () => {
+  it('非 HttpError → リダイレクトしない', () => {
     getOnError()(new Error('plain error'))
     expect(href).toBe('')
   })

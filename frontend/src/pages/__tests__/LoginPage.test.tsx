@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
-import axios from 'axios'
+import { HttpError } from '@/lib/api'
 import { LoginPage } from '../LoginPage'
 
 vi.mock('@/hooks/useAuth')
@@ -84,11 +84,7 @@ describe('LoginPage', () => {
   })
 
   it('フォーム送信: 401 → 認証失敗メッセージを表示する', async () => {
-    const loginAsync = vi.fn().mockRejectedValue(
-      Object.assign(new axios.AxiosError('Unauthorized'), {
-        response: { status: 401 },
-      }),
-    )
+    const loginAsync = vi.fn().mockRejectedValue(new HttpError(401, 'Unauthorized'))
     mockUseAuth.mockReturnValue(makeAuth({ loginAsync }))
     renderLoginPage()
     await userEvent.type(screen.getByLabelText('ユーザー名'), 'user')
@@ -102,11 +98,7 @@ describe('LoginPage', () => {
   })
 
   it('フォーム送信: 423 → アカウントロックメッセージを表示する', async () => {
-    const loginAsync = vi.fn().mockRejectedValue(
-      Object.assign(new axios.AxiosError('Locked'), {
-        response: { status: 423 },
-      }),
-    )
+    const loginAsync = vi.fn().mockRejectedValue(new HttpError(423, 'Locked'))
     mockUseAuth.mockReturnValue(makeAuth({ loginAsync }))
     renderLoginPage()
     await userEvent.type(screen.getByLabelText('ユーザー名'), 'user')
@@ -118,11 +110,7 @@ describe('LoginPage', () => {
   })
 
   it('フォーム送信: その他エラー → 汎用エラーメッセージを表示する', async () => {
-    const loginAsync = vi.fn().mockRejectedValue(
-      Object.assign(new axios.AxiosError('Server Error'), {
-        response: { status: 500 },
-      }),
-    )
+    const loginAsync = vi.fn().mockRejectedValue(new HttpError(500, 'Server Error'))
     mockUseAuth.mockReturnValue(makeAuth({ loginAsync }))
     renderLoginPage()
     await userEvent.type(screen.getByLabelText('ユーザー名'), 'user')

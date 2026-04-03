@@ -1,5 +1,5 @@
-import axios from 'axios'
 import { QueryCache, QueryClient } from '@tanstack/react-query'
+import { HttpError } from '@/lib/api'
 
 /**
  * TanStack Query のグローバル設定
@@ -9,8 +9,8 @@ export const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error) => {
       if (
-        axios.isAxiosError(error) &&
-        error.response?.status === 401 &&
+        error instanceof HttpError &&
+        error.status === 401 &&
         window.location.pathname !== '/login'
       ) {
         window.location.href = '/login'

@@ -1,9 +1,9 @@
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { server } from '@/test/server'
-import api from '../axios'
+import api, { HttpError } from '../api'
 
-describe('getCookieValue (via CSRF interceptor)', () => {
+describe('getCookieValue (via CSRF インターセプター)', () => {
   afterEach(() => {
     // Reset cookie after each test
     document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
@@ -13,7 +13,7 @@ describe('getCookieValue (via CSRF interceptor)', () => {
     let receivedCsrfHeader: string | null = null
     server.use(
       http.post('/api/v1/auth/login', ({ request }) => {
-        receivedCsrfHeader = request.headers.get('X-CSRF-TOKEN')
+        receivedCsrfHeader = request.headers.get('X-XSRF-TOKEN')
         return HttpResponse.json({ data: {} })
       }),
     )
@@ -26,7 +26,7 @@ describe('getCookieValue (via CSRF interceptor)', () => {
     let receivedCsrfHeader: string | null = null
     server.use(
       http.post('/api/v1/auth/login', ({ request }) => {
-        receivedCsrfHeader = request.headers.get('X-CSRF-TOKEN')
+        receivedCsrfHeader = request.headers.get('X-XSRF-TOKEN')
         return HttpResponse.json({ data: {} })
       }),
     )
@@ -39,7 +39,7 @@ describe('getCookieValue (via CSRF interceptor)', () => {
     let receivedCsrfHeader: string | null = null
     server.use(
       http.get('/api/v1/auth/me', ({ request }) => {
-        receivedCsrfHeader = request.headers.get('X-CSRF-TOKEN')
+        receivedCsrfHeader = request.headers.get('X-XSRF-TOKEN')
         return HttpResponse.json({ data: {} })
       }),
     )
@@ -49,21 +49,44 @@ describe('getCookieValue (via CSRF interceptor)', () => {
   })
 })
 
-describe('レスポンスインターセプター', () => {
-  it('成功レスポンスはそのまま返す', async () => {
+describe('クエリパラメータ', () => {
+  it('undefined の値はクエリ文字列に含めない', async () => {
+    let receivedUrl: string | null = null
+    server.use(
+      http.get('/api/v1/users', ({ request }) => {
+        receivedUrl = request.url
+        return HttpResponse.json({ data: [] })
+      }),
+    )
+    await api.get('/users', { params: { page: 1, size: undefined } })
+    expect(receivedUrl).toContain('page=1')
+    expect(receivedUrl).not.toContain('size')
+  })
+})
+
+describe('レスポンス処理', () => {
+  it('成功レスポンスは JSON を返す', async () => {
     server.use(
       http.get('/api/v1/auth/me', () => HttpResponse.json({ data: { id: 1 } })),
     )
-    const response = await api.get('/auth/me')
-    expect(response.status).toBe(200)
-    expect(response.data).toEqual({ data: { id: 1 } })
+    const data = await api.get('/auth/me')
+    expect(data).toEqual({ data: { id: 1 } })
   })
 
-  it('エラーレスポンスは reject される', async () => {
+  it('エラーレスポンスは HttpError を throw する', async () => {
     server.use(
       http.get('/api/v1/auth/me', () => new HttpResponse(null, { status: 500 })),
     )
-    await expect(api.get('/auth/me')).rejects.toThrow()
+    await expect(api.get('/auth/me')).rejects.toBeInstanceOf(HttpError)
+  })
+
+  it('HttpError にはステータスコードが含まれる', async () => {
+    server.use(
+      http.get('/api/v1/auth/me', () => new HttpResponse(null, { status: 404 })),
+    )
+    const error = await api.get('/auth/me').catch((e) => e)
+    expect(error).toBeInstanceOf(HttpError)
+    expect((error as HttpError).status).toBe(404)
   })
 })
 
@@ -75,13 +98,13 @@ describe('CSRF インターセプター: 非安全メソッド', () => {
     document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
   })
 
-  it.each(['put', 'delete', 'patch'] as const)(
+  it.each(['put', 'patch'] as const)(
     '%s リクエストも CSRF トークンを付与する',
     async (method) => {
       let receivedCsrfHeader: string | null = null
       server.use(
         http[method]('/api/v1/users/1', ({ request }) => {
-          receivedCsrfHeader = request.headers.get('X-CSRF-TOKEN')
+          receivedCsrfHeader = request.headers.get('X-XSRF-TOKEN')
           return new HttpResponse(null, { status: 200 })
         }),
       )
@@ -89,4 +112,16 @@ describe('CSRF インターセプター: 非安全メソッド', () => {
       expect(receivedCsrfHeader).toBe('my-token')
     },
   )
+
+  it('delete リクエストも CSRF トークンを付与する', async () => {
+    let receivedCsrfHeader: string | null = null
+    server.use(
+      http.delete('/api/v1/users/1', ({ request }) => {
+        receivedCsrfHeader = request.headers.get('X-XSRF-TOKEN')
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    await api.delete('/users/1').catch(() => {})
+    expect(receivedCsrfHeader).toBe('my-token')
+  })
 })
