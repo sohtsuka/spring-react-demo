@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -102,6 +103,7 @@ export function UserFormDialog({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>ユーザー編集</DialogTitle>
+            <DialogDescription>ユーザー情報を編集します</DialogDescription>
           </DialogHeader>
           <form
             onSubmit={updateForm.handleSubmit((data) =>
@@ -176,6 +178,7 @@ export function UserFormDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>ユーザー作成</DialogTitle>
+          <DialogDescription>新しいユーザーを作成します</DialogDescription>
         </DialogHeader>
         <form
           onSubmit={createForm.handleSubmit((data) =>
