@@ -1,4 +1,24 @@
 {
+  "sandbox": {
+    "autoAllowBashIfSandboxed": true,
+    "enabled": true,
+    "excludedCommands": [
+      "docker *"
+    ],
+    "failIfUnavailable": true,
+    "filesystem": {
+      "denyRead": [
+        "/mnt"
+      ]
+    },
+    "network": {
+      "allowedDomains": [],
+      "allowUnixSockets": [
+        "/var/run/docker.sock"
+      ],
+      "allowLocalBinding": true
+    }
+  },
   "statusLine": {
     "type": "command",
     "command": "bash .claude/statusline-command.sh"
