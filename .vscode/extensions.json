@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    // 日本語化
+    // "ms-ceintl.vscode-language-pack-ja",
+    // for frontend development
+    "bradlc.vscode-tailwindcss",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-playwright.playwright",
+    // for Java+Spring development
+    "vscjava.vscode-java-pack",
+    "vmware.vscode-boot-dev-pack",
+    // for PostgreSQL
+    "ms-ossdata.vscode-pgsql",
+    // for previewing mermaid charts
+    "mermaidchart.vscode-mermaid-chart"
+  ]
+}
