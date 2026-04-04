@@ -1,12 +1,13 @@
 package com.example.app.repository;
 
-import com.example.app.model.entity.User;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import com.example.app.model.entity.User;
 
 @Mapper
 public interface UserRepository {

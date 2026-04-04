@@ -1,21 +1,24 @@
 package com.example.app.util;
 
-import com.example.app.exception.ErrorCode;
-import com.example.app.model.dto.ErrorResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import com.example.app.exception.ErrorCode;
+import com.example.app.model.dto.ErrorResponse;
 
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
@@ -39,16 +42,13 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.getWriter().write(objectMapper.writeValueAsString(
-                ErrorResponse.of(ErrorCode.RATE_LIMIT_EXCEEDED.getCode(),
-                        ErrorCode.RATE_LIMIT_EXCEEDED.getMessage())));
+                ErrorResponse.of(ErrorCode.RATE_LIMIT_EXCEEDED.getCode(), ErrorCode.RATE_LIMIT_EXCEEDED.getMessage())));
         return false;
     }
 
     private Bucket newBucket(String ip) {
-        Bandwidth limit = Bandwidth.builder()
-                .capacity(MAX_REQUESTS_PER_MINUTE)
-                .refillGreedy(MAX_REQUESTS_PER_MINUTE, Duration.ofMinutes(1))
-                .build();
+        Bandwidth limit = Bandwidth.builder().capacity(MAX_REQUESTS_PER_MINUTE)
+                .refillGreedy(MAX_REQUESTS_PER_MINUTE, Duration.ofMinutes(1)).build();
         return Bucket.builder().addLimit(limit).build();
     }
 

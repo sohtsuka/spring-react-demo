@@ -1,9 +1,9 @@
 package com.example.app.security;
 
-import org.springframework.security.crypto.password.PasswordEncoder;
-
 import java.security.SecureRandom;
 import java.util.Base64;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * ソルト＋ペッパーを適用する PasswordEncoder ラッパー。
@@ -50,7 +50,7 @@ public class PepperPasswordEncoder implements PasswordEncoder {
             return false;
         }
         String appSalt = encodedPassword.substring(0, delimIdx);
-        String hash    = encodedPassword.substring(delimIdx + 1);
+        String hash = encodedPassword.substring(delimIdx + 1);
         return delegate.matches(pepper + appSalt + rawPassword, hash);
     }
 

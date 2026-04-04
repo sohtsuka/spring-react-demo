@@ -1,9 +1,10 @@
 package com.example.app.util;
 
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import com.example.app.security.PepperPasswordEncoder;
-
 import java.io.PrintStream;
+
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
+
+import com.example.app.security.PepperPasswordEncoder;
 
 /**
  * Gradle の hashPassword タスクから呼び出される CLI ユーティリティ。
@@ -25,7 +26,7 @@ public class PasswordHasher {
         }
 
         String password = args[0];
-        String pepper   = args.length > 1 ? args[1] : "";
+        String pepper = args.length > 1 ? args[1] : "";
 
         // SecurityConfig と同じパラメーター
         Argon2PasswordEncoder argon2 = new Argon2PasswordEncoder(16, 32, 1, 65536, 3);

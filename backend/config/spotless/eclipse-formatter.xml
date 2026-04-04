@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<profiles version="13">
+<profile kind="CodeFormatterProfile" name="project-style" version="13">
+
+  <!-- インデント: スペース 4 つ -->
+  <setting id="org.eclipse.jdt.core.formatter.tabulation.char" value="space"/>
+  <setting id="org.eclipse.jdt.core.formatter.tabulation.size" value="4"/>
+  <setting id="org.eclipse.jdt.core.formatter.indentation.size" value="4"/>
+  <setting id="org.eclipse.jdt.core.formatter.use_tabs_only_for_leading_indentations" value="false"/>
+
+  <!-- 行長: 120 文字 -->
+  <setting id="org.eclipse.jdt.core.formatter.lineSplit" value="120"/>
+  <setting id="org.eclipse.jdt.core.formatter.comment.line_length" value="120"/>
+
+  <!-- 改行コード: LF -->
+  <setting id="org.eclipse.jdt.core.formatter.line_separator" value="&#10;"/>
+
+  <!-- 波括弧スタイル: K&R (同一行) -->
+  <setting id="org.eclipse.jdt.core.formatter.brace_position_for_type_declaration" value="end_of_line"/>
+  <setting id="org.eclipse.jdt.core.formatter.brace_position_for_method_declaration" value="end_of_line"/>
+  <setting id="org.eclipse.jdt.core.formatter.brace_position_for_constructor_declaration" value="end_of_line"/>
+  <setting id="org.eclipse.jdt.core.formatter.brace_position_for_block" value="end_of_line"/>
+  <setting id="org.eclipse.jdt.core.formatter.brace_position_for_switch" value="end_of_line"/>
+  <setting id="org.eclipse.jdt.core.formatter.brace_position_for_annotation_type_declaration" value="end_of_line"/>
+  <setting id="org.eclipse.jdt.core.formatter.brace_position_for_enum_declaration" value="end_of_line"/>
+  <setting id="org.eclipse.jdt.core.formatter.brace_position_for_record_declaration" value="end_of_line"/>
+
+  <!-- 空白行の制御 -->
+  <setting id="org.eclipse.jdt.core.formatter.blank_lines_before_package" value="0"/>
+  <setting id="org.eclipse.jdt.core.formatter.blank_lines_after_package" value="1"/>
+  <setting id="org.eclipse.jdt.core.formatter.blank_lines_before_imports" value="1"/>
+  <setting id="org.eclipse.jdt.core.formatter.blank_lines_after_imports" value="1"/>
+  <setting id="org.eclipse.jdt.core.formatter.blank_lines_between_type_declarations" value="1"/>
+
+  <!-- スペース: 演算子まわり -->
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_before_binary_operator" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_binary_operator" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_before_assignment_operator" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_assignment_operator" value="insert"/>
+
+  <!-- スペース: カンマ・セミコロン後 -->
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_method_declaration_parameters" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_method_invocation_arguments" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_type_arguments" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_type_parameters" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_for_increments" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_for_init" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_array_initializer" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_superinterfaces" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_multiple_local_declarations" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_multiple_field_declarations" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_comma_in_annotation" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_semicolon_in_for" value="insert"/>
+
+  <!-- スペース: キャスト後 -->
+  <setting id="org.eclipse.jdt.core.formatter.insert_space_after_closing_paren_in_cast" value="insert"/>
+
+  <!-- コメントフォーマット -->
+  <setting id="org.eclipse.jdt.core.formatter.comment.format_line_comments" value="false"/>
+  <setting id="org.eclipse.jdt.core.formatter.comment.format_block_comments" value="false"/>
+  <setting id="org.eclipse.jdt.core.formatter.comment.format_javadoc_comments" value="false"/>
+  <setting id="org.eclipse.jdt.core.formatter.comment.format_header_comment" value="false"/>
+
+  <!-- 末尾の空白除去 -->
+  <setting id="org.eclipse.jdt.core.formatter.remove_trailing_whitespace_in_non_empty_lines" value="true"/>
+
+  <!-- アノテーションの改行 -->
+  <setting id="org.eclipse.jdt.core.formatter.insert_new_line_after_annotation_on_type" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_new_line_after_annotation_on_method" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_new_line_after_annotation_on_field" value="insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_new_line_after_annotation_on_parameter" value="do not insert"/>
+  <setting id="org.eclipse.jdt.core.formatter.insert_new_line_after_annotation_on_local_variable" value="insert"/>
+
+  <!-- Wrap スタイル -->
+  <setting id="org.eclipse.jdt.core.formatter.alignment_for_parameters_in_method_declaration" value="16"/>
+  <setting id="org.eclipse.jdt.core.formatter.alignment_for_arguments_in_method_invocation" value="16"/>
+  <setting id="org.eclipse.jdt.core.formatter.alignment_for_throws_clause_in_method_declaration" value="16"/>
+  <setting id="org.eclipse.jdt.core.formatter.alignment_for_superinterfaces_in_type_declaration" value="16"/>
+  <setting id="org.eclipse.jdt.core.formatter.alignment_for_binary_expression" value="16"/>
+
+</profile>
+</profiles>

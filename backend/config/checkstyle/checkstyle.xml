@@ -1,0 +1,113 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<module name="Checker">
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <!-- 抑制フィルター: checkstyle-suppressions.xml に従い個別のチェックを除外 -->
+    <module name="SuppressionFilter">
+        <property name="file" value="${config_loc}/checkstyle-suppressions.xml"/>
+        <property name="optional" value="false"/>
+    </module>
+
+    <!-- ファイル末尾の改行 -->
+    <module name="NewlineAtEndOfFile"/>
+
+    <!-- タブ文字禁止（4スペースインデントを使用） -->
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+    </module>
+
+    <!-- 行長: palantir-java-format のデフォルト 120 文字に合わせる -->
+    <!-- (LineLength は Checker 直下に置く必要がある) -->
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <!-- パッケージ・import 宣言および URL は除外 -->
+        <property name="ignorePattern"
+                  value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
+    </module>
+
+    <module name="TreeWalker">
+
+        <!-- ======================================================= -->
+        <!-- Import                                                    -->
+        <!-- ======================================================= -->
+        <module name="UnusedImports"/>
+        <module name="RedundantImport"/>
+        <!-- sun.* / com.sun.* 内部 API 使用禁止 -->
+        <module name="IllegalImport">
+            <property name="illegalPkgs" value="sun, com.sun"/>
+        </module>
+
+        <!-- ======================================================= -->
+        <!-- 命名規則                                                  -->
+        <!-- ======================================================= -->
+        <!-- static final フィールドは UPPER_SNAKE_CASE -->
+        <!-- SLF4J の慣例として小文字の "log" は許可する -->
+        <module name="ConstantName">
+            <property name="format" value="^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$|^log$"/>
+        </module>
+        <module name="LocalVariableName"/>
+        <module name="MemberName"/>
+        <module name="MethodName"/>
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+        <module name="ParameterName"/>
+        <module name="StaticVariableName"/>
+        <module name="TypeName"/>
+
+        <!-- ======================================================= -->
+        <!-- コード品質                                                -->
+        <!-- ======================================================= -->
+        <!-- equals をオーバーライドするなら hashCode も必須 -->
+        <module name="EqualsHashCode"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <!-- == で文字列比較禁止 -->
+        <module name="StringLiteralEquality"/>
+        <!-- ネストの深さ制限 -->
+        <module name="NestedIfDepth">
+            <property name="max" value="3"/>
+        </module>
+        <module name="NestedTryDepth">
+            <property name="max" value="2"/>
+        </module>
+
+        <!-- ======================================================= -->
+        <!-- 修飾子                                                    -->
+        <!-- ======================================================= -->
+        <!-- public static final の順序を強制 -->
+        <module name="ModifierOrder"/>
+
+        <!-- ======================================================= -->
+        <!-- ブロック                                                  -->
+        <!-- ======================================================= -->
+        <module name="EmptyBlock">
+            <property name="option" value="TEXT"/>
+        </module>
+        <!-- 空の catch ブロックは変数名が expected または ignored の場合のみ許可 -->
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="expected|ignored"/>
+        </module>
+        <!-- if/for/while/do の波括弧を必須化 -->
+        <module name="NeedBraces"/>
+
+        <!-- ======================================================= -->
+        <!-- 空白                                                      -->
+        <!-- ======================================================= -->
+        <module name="GenericWhitespace"/>
+        <module name="MethodParamPad"/>
+        <module name="NoWhitespaceBefore"/>
+        <module name="WhitespaceAround">
+            <!-- テストの空コンストラクタ・空メソッドを許可 -->
+            <property name="allowEmptyConstructors" value="true"/>
+            <property name="allowEmptyMethods" value="true"/>
+            <property name="allowEmptyTypes" value="true"/>
+        </module>
+
+    </module>
+</module>

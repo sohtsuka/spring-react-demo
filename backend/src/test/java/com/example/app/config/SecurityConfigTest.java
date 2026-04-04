@@ -1,21 +1,23 @@
 package com.example.app.config;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.web.filter.OncePerRequestFilter;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
-import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.mock;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 class SecurityConfigTest {
 
@@ -25,14 +27,13 @@ class SecurityConfigTest {
     @BeforeEach
     void setUp() throws Exception {
         Class<?> filterClass = Arrays.stream(SecurityConfig.class.getDeclaredClasses())
-                .filter(c -> c.getSimpleName().equals("CsrfCookieFilter"))
-                .findFirst().orElseThrow();
+                .filter(c -> c.getSimpleName().equals("CsrfCookieFilter")).findFirst().orElseThrow();
         Constructor<?> ctor = filterClass.getDeclaredConstructor();
         ctor.setAccessible(true);
         filter = (OncePerRequestFilter) ctor.newInstance();
 
-        doFilterInternal = filterClass.getDeclaredMethod("doFilterInternal",
-                HttpServletRequest.class, HttpServletResponse.class, FilterChain.class);
+        doFilterInternal = filterClass.getDeclaredMethod("doFilterInternal", HttpServletRequest.class,
+                HttpServletResponse.class, FilterChain.class);
         doFilterInternal.setAccessible(true);
     }
 

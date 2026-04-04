@@ -1,7 +1,17 @@
 package com.example.app.config;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -9,15 +19,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -40,9 +41,7 @@ class SecurityConfigIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(wac)
-                .apply(springSecurity())
-                .build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(wac).apply(springSecurity()).build();
     }
 
     /**
@@ -51,10 +50,8 @@ class SecurityConfigIntegrationTest {
      */
     @Test
     void unauthenticated_request_invokes_authenticationEntryPoint() throws Exception {
-        mockMvc.perform(get("/api/v1/users"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.message").value("認証が必要です"));
+        mockMvc.perform(get("/api/v1/users")).andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED")).andExpect(jsonPath("$.message").value("認証が必要です"));
     }
 
     /**
@@ -64,9 +61,7 @@ class SecurityConfigIntegrationTest {
      */
     @Test
     void authenticated_as_user_role_invokes_accessDeniedHandler() throws Exception {
-        mockMvc.perform(get("/api/v1/users")
-                        .with(user("testuser").roles("USER")))
-                .andExpect(status().isForbidden())
+        mockMvc.perform(get("/api/v1/users").with(user("testuser").roles("USER"))).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"))
                 .andExpect(jsonPath("$.message").value("この操作を行う権限がありません"));
     }

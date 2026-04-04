@@ -4,6 +4,9 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
     id 'jacoco'
     id 'org.owasp.dependencycheck' version '12.2.0'
+    id 'checkstyle'
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.spotbugs.plugin)
 }
 
 group = 'com.example'
@@ -56,8 +59,80 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation libs.mybatis.spring.boot.starter.test
     testImplementation libs.bundles.testcontainers
+    testImplementation libs.archunit.junit5
+
+    // SpotBugs annotations (@SuppressFBWarnings)
+    compileOnly libs.spotbugs.annotations
+    testCompileOnly libs.spotbugs.annotations
 }
 
+// ---------------------------------------------------------------------------
+// Spotless — コードフォーマット
+// ---------------------------------------------------------------------------
+spotless {
+    java {
+        // palantir-java-format / google-java-format はともに JDK 内部 API
+        // (Log$DeferredDiagnosticHandler) に依存しており Java 25 で動作しないため、
+        // JDK 非依存の Eclipse formatter を使用する。
+        eclipse().configFile(layout.projectDirectory.file('config/spotless/eclipse-formatter.xml'))
+        removeUnusedImports()
+        importOrder('java', 'javax', 'jakarta', '', 'org.springframework', 'com.example')
+        trimTrailingWhitespace()
+        endWithNewline()
+        target 'src/**/*.java'
+        targetExclude 'build/**'
+    }
+}
+
+// コンパイル前にフォーマットチェックを強制
+compileJava.dependsOn spotlessCheck
+compileTestJava.dependsOn spotlessCheck
+
+// ---------------------------------------------------------------------------
+// Checkstyle — コードスタイル検査
+// ---------------------------------------------------------------------------
+checkstyle {
+    toolVersion = libs.versions.checkstyle.get()
+    configFile = layout.projectDirectory.file('config/checkstyle/checkstyle.xml').asFile
+    maxWarnings = 0
+    ignoreFailures = false
+}
+
+tasks.withType(Checkstyle).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SpotBugs — バイトコード静的解析
+// ---------------------------------------------------------------------------
+spotbugs {
+    toolVersion = libs.versions.spotbugs.get()
+    effort = com.github.spotbugs.snom.Effort.MAX
+    reportLevel = com.github.spotbugs.snom.Confidence.valueOf("HIGH")
+    ignoreFailures = false
+    excludeFilter = layout.projectDirectory.file('config/spotbugs/exclude.xml')
+}
+
+spotbugsMain {
+    reports {
+        xml.required = false
+        html.required = true
+        sarif.required = true
+    }
+}
+
+spotbugsTest {
+    reports {
+        xml.required = false
+        html.required = true
+        sarif.required = true
+    }
+}
+
+// ---------------------------------------------------------------------------
 dependencyCheck {
     nvd {
         apiKey = System.getenv('NVD_API_KEY')
@@ -85,6 +160,12 @@ jacocoTestCoverageVerification {
                 minimum = 1.0
             }
         }
+    }
+    // ArchUnit テストクラスはブランチがないためカバレッジ対象から除外
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect {
+            fileTree(dir: it, exclude: ['**/ArchitectureTest.class'])
+        })
     }
     dependsOn jacocoTestReport
 }

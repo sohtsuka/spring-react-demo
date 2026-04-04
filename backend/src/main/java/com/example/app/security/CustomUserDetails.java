@@ -1,13 +1,14 @@
 package com.example.app.security;
 
-import com.example.app.model.entity.User;
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.LocalDateTime;
-import java.util.Collection;
-import java.util.List;
+import com.example.app.model.entity.User;
 
 public class CustomUserDetails implements UserDetails {
 

@@ -1,21 +1,23 @@
 package com.example.app.security;
 
-import com.example.app.model.entity.User;
-import com.example.app.model.enums.UserRole;
-import com.example.app.repository.UserRepository;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.given;
+import com.example.app.model.entity.User;
+import com.example.app.model.enums.UserRole;
+import com.example.app.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class CustomUserDetailsServiceTest {
@@ -41,8 +43,7 @@ class CustomUserDetailsServiceTest {
     void loadUserByUsername_notFound_throwsUsernameNotFoundException() {
         given(userRepository.findByUsername("ghost")).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.loadUserByUsername("ghost"))
-                .isInstanceOf(UsernameNotFoundException.class);
+        assertThatThrownBy(() -> service.loadUserByUsername("ghost")).isInstanceOf(UsernameNotFoundException.class);
     }
 
     private User buildUser(String username) {

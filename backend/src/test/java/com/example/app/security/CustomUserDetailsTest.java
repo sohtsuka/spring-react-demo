@@ -1,12 +1,13 @@
 package com.example.app.security;
 
-import com.example.app.model.entity.User;
-import com.example.app.model.enums.UserRole;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDateTime;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+
+import com.example.app.model.entity.User;
+import com.example.app.model.enums.UserRole;
 
 class CustomUserDetailsTest {
 

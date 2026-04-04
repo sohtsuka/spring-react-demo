@@ -1,16 +1,10 @@
 package com.example.app.controller;
 
-import com.example.app.exception.AppException;
-import com.example.app.exception.ErrorCode;
-import com.example.app.model.dto.ApiResponse;
-import com.example.app.model.dto.LoginRequest;
-import com.example.app.model.dto.UserResponse;
-import com.example.app.security.CustomUserDetails;
-import com.example.app.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -27,6 +21,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.app.exception.AppException;
+import com.example.app.exception.ErrorCode;
+import com.example.app.model.dto.ApiResponse;
+import com.example.app.model.dto.LoginRequest;
+import com.example.app.model.dto.UserResponse;
+import com.example.app.security.CustomUserDetails;
+import com.example.app.service.UserService;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -40,15 +42,13 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<UserResponse>> login(
-            @Valid @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse) {
+    public ResponseEntity<ApiResponse<UserResponse>> login(@Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
 
         Authentication auth;
         try {
-            auth = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+            auth = authenticationManager
+                    .authenticate(new UsernamePasswordAuthenticationToken(request.username(), request.password()));
         } catch (LockedException ex) {
             throw new AppException(ErrorCode.ACCOUNT_LOCKED);
         } catch (DisabledException ex) {
@@ -68,8 +68,7 @@ public class AuthController {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(auth);
         SecurityContextHolder.setContext(context);
-        newSession.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+        newSession.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
 
         userService.resetLoginAttempts(request.username());
 

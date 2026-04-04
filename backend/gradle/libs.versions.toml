@@ -4,6 +4,11 @@ mybatisSpringBoot = "4.0.1"
 bucket4j = "8.17.0"
 bouncyCastle = "1.83"
 testcontainers = "2.0.4"
+spotless = "8.4.0"
+checkstyle = "10.24.0"
+spotbugs = "4.9.8"
+spotbugsPlugin = "6.4.8"
+archunit = "1.4.1"
 
 [libraries]
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
@@ -14,6 +19,12 @@ bcprov-jdk18on = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bo
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+spotbugs-annotations = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "spotbugs" }
 
 [bundles]
 testcontainers = ["testcontainers-junit-jupiter", "testcontainers-postgresql"]
+
+[plugins]
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+spotbugs-plugin = { id = "com.github.spotbugs", version.ref = "spotbugsPlugin" }

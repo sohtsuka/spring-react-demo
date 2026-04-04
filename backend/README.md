@@ -80,9 +80,17 @@ curl -b cookies.txt -X POST http://localhost:8080/api/v1/logout \
 
 ---
 
-## テスト
+## テスト・品質チェック
 
-### ユニットテスト + 統合テスト
+### 全品質チェックを一括実行 (CI と同等)
+
+```bash
+./gradlew spotlessCheck checkstyleMain checkstyleTest test spotbugsMain jacocoTestCoverageVerification
+```
+
+---
+
+### ユニットテスト + 統合テスト + アーキテクチャーテスト
 
 ```bash
 ./gradlew test
@@ -91,6 +99,7 @@ curl -b cookies.txt -X POST http://localhost:8080/api/v1/logout \
 - Controller テスト: `@WebMvcTest` (MockMvc)
 - Service テスト: Mockito
 - Repository テスト: Testcontainers (PostgreSQL コンテナを自動起動)
+- アーキテクチャーテスト: ArchUnit (レイヤー依存ルール・循環依存禁止等)
 
 ### カバレッジレポート生成
 
@@ -107,6 +116,46 @@ curl -b cookies.txt -X POST http://localhost:8080/api/v1/logout \
 ```
 
 基準未達の場合はビルドが失敗する。
+
+---
+
+### コードフォーマット (Spotless + palantir-java-format)
+
+フォーマット違反を検出する (CI で実行):
+
+```bash
+./gradlew spotlessCheck
+```
+
+違反を自動修正する:
+
+```bash
+./gradlew spotlessApply
+```
+
+---
+
+### 静的解析 (Checkstyle)
+
+命名規則・import ルール・波括弧の必須化等を検査する:
+
+```bash
+./gradlew checkstyleMain checkstyleTest
+```
+
+レポートは `build/reports/checkstyle/` で確認できる。
+
+### 静的解析 (SpotBugs)
+
+バイトコードレベルのバグパターン (null 参照・リソースリーク等) を検査する:
+
+```bash
+./gradlew spotbugsMain
+```
+
+レポートは `build/reports/spotbugs/main.html` で確認できる。
+
+---
 
 ### 脆弱性スキャン
 

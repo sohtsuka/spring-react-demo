@@ -1,5 +1,12 @@
 package com.example.app.service.impl;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.app.exception.AppException;
 import com.example.app.exception.ErrorCode;
 import com.example.app.model.dto.CreateUserRequest;
@@ -9,12 +16,6 @@ import com.example.app.model.dto.UserResponse;
 import com.example.app.model.entity.User;
 import com.example.app.repository.UserRepository;
 import com.example.app.service.UserService;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @Transactional
@@ -35,10 +36,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public PagedResponse<UserResponse> findAll(int page, int size) {
         int offset = (page - 1) * size;
-        List<UserResponse> users = userRepository.findAll(offset, size)
-                .stream()
-                .map(UserResponse::from)
-                .toList();
+        List<UserResponse> users = userRepository.findAll(offset, size).stream().map(UserResponse::from).toList();
         long total = userRepository.count();
         return PagedResponse.of(users, page, size, total);
     }
@@ -46,8 +44,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse findById(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        User user = userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         return UserResponse.from(user);
     }
 
@@ -76,8 +73,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse update(Long id, UpdateUserRequest request) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        User user = userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (request.username() != null && !request.username().equals(user.getUsername())) {
             if (userRepository.existsByUsername(request.username())) {

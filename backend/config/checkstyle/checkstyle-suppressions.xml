@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+    <!--
+      テストメソッドは "methodName_scenario_expectedResult" の形式でアンダースコアを使う慣例。
+      これは JUnit コミュニティで広く採用されている可読性向上のパターン。
+    -->
+    <suppress checks="MethodName" files=".*Test\.java$"/>
+
+    <!--
+      CreateUserRequest のパスワードフィールド: @Pattern アノテーションの message 属性に
+      日本語の長いメッセージを含むため、Eclipse フォーマッターが1行に展開する。
+      フォーマッターとの競合を避けるため、この行の LineLength チェックを抑制する。
+    -->
+    <suppress checks="LineLength" files="CreateUserRequest\.java" lines="15"/>
+</suppressions>

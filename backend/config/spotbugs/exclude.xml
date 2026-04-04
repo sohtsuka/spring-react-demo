@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs 除外フィルター
+
+  既知の誤検知または設計上の意図的なパターンを除外する。
+  新しい HIGH 検出が出た場合は、まず修正を検討し、
+  やむを得ない場合のみここに追加してコメントで理由を記載すること。
+-->
+<FindBugsFilter>
+
+    <!--
+      SecurityConfig: ObjectMapper を @Bean ではなくフィールドでインスタンス化している。
+      これは Spring Boot 4 の初期化順序における循環依存を回避するための意図的な設計。
+      インスタンスは構築後に不変として扱われる。
+    -->
+    <Match>
+        <Class name="com.example.app.config.SecurityConfig"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+      RateLimitInterceptor: 同上の理由で ObjectMapper をフィールドでインスタンス化。
+    -->
+    <Match>
+        <Class name="com.example.app.util.RateLimitInterceptor"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+      テストクラス: Spring の DI フレームワークがフィールドを注入するため、
+      コンストラクタ未初期化フィールドの警告は誤検知となる。
+    -->
+    <Match>
+        <Class name="~.*Test"/>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+    </Match>
+
+</FindBugsFilter>

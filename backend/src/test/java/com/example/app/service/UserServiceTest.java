@@ -1,5 +1,25 @@
 package com.example.app.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import com.example.app.exception.AppException;
 import com.example.app.exception.ErrorCode;
 import com.example.app.model.dto.CreateUserRequest;
@@ -10,24 +30,6 @@ import com.example.app.model.entity.User;
 import com.example.app.model.enums.UserRole;
 import com.example.app.repository.UserRepository;
 import com.example.app.service.impl.UserServiceImpl;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -67,16 +69,13 @@ class UserServiceTest {
     void findById_notFound_throwsAppException() {
         given(userRepository.findById(99L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.findById(99L))
-                .isInstanceOf(AppException.class)
-                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
-                        .isEqualTo(ErrorCode.USER_NOT_FOUND));
+        assertThatThrownBy(() -> userService.findById(99L)).isInstanceOf(AppException.class)
+                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
     }
 
     @Test
     void create_newUser_insertsAndReturns() {
-        CreateUserRequest request = new CreateUserRequest(
-                "newuser", "new@example.com", "Password1!", UserRole.USER);
+        CreateUserRequest request = new CreateUserRequest("newuser", "new@example.com", "Password1!", UserRole.USER);
         given(userRepository.existsByUsername("newuser")).willReturn(false);
         given(userRepository.existsByEmail("new@example.com")).willReturn(false);
         given(passwordEncoder.encode("Password1!")).willReturn("hashedPassword");
@@ -103,10 +102,9 @@ class UserServiceTest {
     void create_duplicateUsername_throwsAppException() {
         given(userRepository.existsByUsername("existing")).willReturn(true);
 
-        assertThatThrownBy(() -> userService.create(
-                new CreateUserRequest("existing", "e@example.com", "Password1!", UserRole.USER)))
-                .isInstanceOf(AppException.class)
-                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+        assertThatThrownBy(() -> userService
+                .create(new CreateUserRequest("existing", "e@example.com", "Password1!", UserRole.USER)))
+                .isInstanceOf(AppException.class).satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                         .isEqualTo(ErrorCode.USERNAME_ALREADY_EXISTS));
     }
 
@@ -115,11 +113,10 @@ class UserServiceTest {
         given(userRepository.existsByUsername(anyString())).willReturn(false);
         given(userRepository.existsByEmail("dup@example.com")).willReturn(true);
 
-        assertThatThrownBy(() -> userService.create(
-                new CreateUserRequest("newuser", "dup@example.com", "Password1!", UserRole.USER)))
-                .isInstanceOf(AppException.class)
-                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
-                        .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS));
+        assertThatThrownBy(() -> userService
+                .create(new CreateUserRequest("newuser", "dup@example.com", "Password1!", UserRole.USER)))
+                .isInstanceOf(AppException.class).satisfies(
+                        ex -> assertThat(((AppException) ex).getErrorCode()).isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS));
     }
 
     @Test
@@ -149,10 +146,8 @@ class UserServiceTest {
     void delete_notFound_throwsAppException() {
         given(userRepository.findById(99L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.delete(99L))
-                .isInstanceOf(AppException.class)
-                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
-                        .isEqualTo(ErrorCode.USER_NOT_FOUND));
+        assertThatThrownBy(() -> userService.delete(99L)).isInstanceOf(AppException.class)
+                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
     }
 
     @Test
@@ -191,8 +186,7 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.update(99L, new UpdateUserRequest(null, null, null, null)))
                 .isInstanceOf(AppException.class)
-                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
-                        .isEqualTo(ErrorCode.USER_NOT_FOUND));
+                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
     }
 
     @Test
@@ -212,8 +206,7 @@ class UserServiceTest {
         given(userRepository.existsByUsername("other")).willReturn(true);
 
         assertThatThrownBy(() -> userService.update(1L, new UpdateUserRequest("other", null, null, null)))
-                .isInstanceOf(AppException.class)
-                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isInstanceOf(AppException.class).satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                         .isEqualTo(ErrorCode.USERNAME_ALREADY_EXISTS));
     }
 
@@ -246,9 +239,8 @@ class UserServiceTest {
         given(userRepository.existsByEmail("other@example.com")).willReturn(true);
 
         assertThatThrownBy(() -> userService.update(1L, new UpdateUserRequest(null, "other@example.com", null, null)))
-                .isInstanceOf(AppException.class)
-                .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
-                        .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS));
+                .isInstanceOf(AppException.class).satisfies(
+                        ex -> assertThat(((AppException) ex).getErrorCode()).isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS));
     }
 
     @Test
