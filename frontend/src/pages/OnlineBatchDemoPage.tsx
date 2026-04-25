@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, RefreshCw } from 'lucide-react'
 import { onlineBatchApi } from '@/api/onlineBatch'
@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/useToast'
-import type { BatchJobStatus, OnlineBatchJob, StartOnlineBatchRequest } from '@/types'
+import type { BatchJobStatus, StartOnlineBatchRequest } from '@/types'
 
 const defaultForm: StartOnlineBatchRequest = {
   jobName: '売上CSV取込デモ',
@@ -45,21 +45,17 @@ export function OnlineBatchDemoPage() {
     },
   })
 
+  const resolvedSelectedJobId = selectedJobId ?? jobsQuery.data?.[0]?.id ?? null
+
   const selectedJobQuery = useQuery({
-    queryKey: ['online-batch-job', selectedJobId],
-    queryFn: () => onlineBatchApi.getJob(selectedJobId!),
-    enabled: selectedJobId !== null,
+    queryKey: ['online-batch-job', resolvedSelectedJobId],
+    queryFn: () => onlineBatchApi.getJob(resolvedSelectedJobId!),
+    enabled: resolvedSelectedJobId !== null,
     refetchInterval: (query) => {
       const job = query.state.data
       return job && isActiveStatus(job.status) ? 1000 : false
     },
   })
-
-  useEffect(() => {
-    if (!selectedJobId && jobsQuery.data?.[0]) {
-      setSelectedJobId(jobsQuery.data[0].id)
-    }
-  }, [jobsQuery.data, selectedJobId])
 
   const startMutation = useMutation({
     mutationFn: onlineBatchApi.startJob,
@@ -212,7 +208,9 @@ export function OnlineBatchDemoPage() {
                     key={job.id}
                     type="button"
                     className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                      selectedJobId === job.id ? 'border-primary bg-accent/30' : 'hover:bg-accent/30'
+                      resolvedSelectedJobId === job.id
+                        ? 'border-primary bg-accent/30'
+                        : 'hover:bg-accent/30'
                     }`}
                     onClick={() => setSelectedJobId(job.id)}
                   >

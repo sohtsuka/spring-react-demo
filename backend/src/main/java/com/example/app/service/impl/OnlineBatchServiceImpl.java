@@ -10,7 +10,6 @@ import java.util.concurrent.Executors;
 import jakarta.annotation.PreDestroy;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,8 +29,6 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
 
     private static final int DEFAULT_DELAY_MS = 400;
     private static final int MAX_RECENT_EVENTS = 8;
-    private static final TypeReference<List<String>> RECENT_EVENTS_TYPE = new TypeReference<>() {
-    };
 
     private final OnlineBatchJobRepository onlineBatchJobRepository;
     private final ExecutorService executor;
@@ -181,7 +178,8 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
             if (json == null || json.isBlank()) {
                 return List.of();
             }
-            return objectMapper.readValue(json, RECENT_EVENTS_TYPE);
+            return objectMapper.readValue(json,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
         } catch (JsonProcessingException ex) {
             throw new UncheckedIOException(ex);
         }

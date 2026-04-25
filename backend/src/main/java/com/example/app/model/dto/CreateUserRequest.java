@@ -9,10 +9,7 @@ import jakarta.validation.constraints.Size;
 import com.example.app.model.enums.UserRole;
 
 public record CreateUserRequest(@NotBlank @Size(min = 3, max = 50) String username,
-
         @NotBlank @Email @Size(max = 255) String email,
-
         @NotBlank @Size(min = 8, max = 255) @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^a-zA-Z\\d]).+$", message = "パスワードは英大文字・英小文字・数字・記号をそれぞれ1文字以上含む必要があります") String password,
-
         @NotNull UserRole role) {
 }
