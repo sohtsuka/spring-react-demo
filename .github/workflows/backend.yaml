@@ -1,0 +1,101 @@
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yaml'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  security-events: write  # SpotBugs SARIF を GitHub Code Scanning にアップロードするため
+
+jobs:
+  build:
+    name: Build, Test & Quality
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Java 25
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('backend/**/*.toml', 'backend/**/*.gradle', 'backend/**/gradle.lockfile') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Step 1: フォーマットチェック（最速で失敗するチェックを先頭に）
+      - name: Check formatting (Spotless)
+        run: ./gradlew spotlessCheck
+
+      # Step 2: コンパイル + Checkstyle
+      - name: Compile and Checkstyle
+        run: ./gradlew checkstyleMain checkstyleTest
+
+      # Step 3: テスト（ArchUnit 含む）+ SpotBugs + カバレッジ検証
+      - name: Test, SpotBugs & Coverage
+        run: ./gradlew test spotbugsMain jacocoTestCoverageVerification
+
+      # テスト結果を GitHub Checks に表示
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2.23.0
+        if: always()
+        with:
+          files: backend/build/test-results/**/*.xml
+
+      # SpotBugs SARIF を GitHub Security タブにアップロード
+      - name: Upload SpotBugs SARIF
+        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
+        if: always()
+        with:
+          sarif_file: backend/build/reports/spotbugs/main.sarif
+          category: spotbugs
+
+      # 失敗時のみレポートを artifact として保存
+      - name: Upload Checkstyle report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: checkstyle-reports
+          path: backend/build/reports/checkstyle/
+
+      - name: Upload SpotBugs report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: spotbugs-reports
+          path: backend/build/reports/spotbugs/
+
+      # カバレッジレポートは常時保存
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: jacoco-report
+          path: backend/build/reports/jacoco/

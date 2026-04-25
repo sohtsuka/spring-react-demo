@@ -15,7 +15,7 @@
             gradle_9
             jdk25
             (nodejs_24.override { enableNpm = false; })
-            pnpm_10
+            (pnpm_10.override { withNode = false; })
             postgresql_18
             devcontainer
           ];
