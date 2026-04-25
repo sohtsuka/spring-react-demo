@@ -1,5 +1,5 @@
 [versions]
-springBoot = "4.0.4"
+springBoot = "4.0.5"
 mybatisSpringBoot = "4.0.1"
 bucket4j = "8.17.0"
 bouncyCastle = "1.83"
