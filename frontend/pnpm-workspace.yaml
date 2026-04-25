@@ -1,4 +1,4 @@
-minimumReleaseAge: 10080
+minimumReleaseAge: 10080 # 7 days
 
 minimumReleaseAgeExclude:
   - '@typescript-eslint/eslint-plugin'
@@ -18,3 +18,4 @@ onlyBuiltDependencies:
   - msw
 
 trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 43200 # 30 days
