@@ -1,5 +1,7 @@
+import { Link } from 'react-router'
 import { useAuth } from '@/hooks/useAuth'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function DashboardPage() {
@@ -38,6 +40,20 @@ export function DashboardPage() {
                 <Badge variant="secondary">{user?.role}</Badge>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">オンラインバッチ</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              非同期で実行されるバッチジョブの受付と進捗確認を試せます。
+            </p>
+            <Button asChild>
+              <Link to="/batch-demo">デモを開く</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

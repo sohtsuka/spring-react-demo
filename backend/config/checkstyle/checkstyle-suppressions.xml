@@ -15,5 +15,5 @@
       日本語の長いメッセージを含むため、Eclipse フォーマッターが1行に展開する。
       フォーマッターとの競合を避けるため、この行の LineLength チェックを抑制する。
     -->
-    <suppress checks="LineLength" files="CreateUserRequest\.java" lines="15"/>
+    <suppress checks="LineLength" files="CreateUserRequest\.java" lines="13"/>
 </suppressions>
