@@ -1,23 +1,9 @@
-minimumReleaseAge: 10080 # 7 days
-
-minimumReleaseAgeExclude:
-  - '@typescript-eslint/eslint-plugin'
-  - '@typescript-eslint/parser'
-  - '@typescript-eslint/project-service'
-  - '@typescript-eslint/scope-manager'
-  - '@typescript-eslint/tsconfig-utils'
-  - '@typescript-eslint/type-utils'
-  - '@typescript-eslint/types'
-  - '@typescript-eslint/typescript-estree'
-  - '@typescript-eslint/utils'
-  - '@typescript-eslint/visitor-keys'
-  - typescript-eslint
-  # Renovate security update: vite@8.0.5
-  - vite@8.0.5
+minimumReleaseAge: 10080
 
 onlyBuiltDependencies:
   - esbuild
   - msw
 
 trustPolicy: no-downgrade
-trustPolicyIgnoreAfter: 43200 # 30 days
+
+trustPolicyIgnoreAfter: 43200
