@@ -148,6 +148,11 @@ jacocoTestReport {
         xml.required = true
         html.required = true
     }
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect {
+            fileTree(dir: it, exclude: ['**/ArchitectureTest.class', '**/Application.class', '**/PasswordHasher.class'])
+        })
+    }
     dependsOn test
 }
 
@@ -164,11 +169,14 @@ jacocoTestCoverageVerification {
     // ArchUnit テストクラスはブランチがないためカバレッジ対象から除外
     afterEvaluate {
         classDirectories.setFrom(classDirectories.files.collect {
-            fileTree(dir: it, exclude: ['**/ArchitectureTest.class'])
+            fileTree(dir: it,
+                    exclude: ['**/ArchitectureTest.class', '**/Application.class', '**/PasswordHasher.class'])
         })
     }
     dependsOn jacocoTestReport
 }
+
+check.dependsOn jacocoTestCoverageVerification
 
 test {
     useJUnitPlatform()

@@ -1,8 +1,15 @@
 package com.example.app.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
+import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -13,11 +20,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import com.example.app.exception.AppException;
+import com.example.app.exception.ErrorCode;
 import com.example.app.model.dto.OnlineBatchJobResponse;
 import com.example.app.model.dto.StartOnlineBatchRequest;
 import com.example.app.model.entity.OnlineBatchJob;
@@ -63,6 +72,93 @@ class OnlineBatchServiceTest {
     @Test
     void start_withFailureAtItemGreaterThanTotal_throwsValidationError() {
         assertThrows(AppException.class, () -> onlineBatchService.start(new StartOnlineBatchRequest("不正", 3, 4, 0)));
+    }
+
+    @Test
+    void start_withNullDelay_usesDefaultDelay() {
+        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("標準遅延", 1, null, null));
+
+        assertEquals(400, accepted.processingDelayMs());
+    }
+
+    @Test
+    void start_withZeroDelay_completesWithoutSleeping() throws Exception {
+        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("即時実行", 2, null, 0));
+
+        OnlineBatchJobResponse completed = waitUntilFinished(accepted.id());
+
+        assertEquals(BatchJobStatus.COMPLETED, completed.status());
+        assertEquals(0, completed.processingDelayMs());
+    }
+
+    @Test
+    void findById_withNullRecentEvents_returnsEmptyEvents() {
+        Long jobId = onlineBatchJobRepository.seedJob(job -> job.setRecentEvents(null));
+
+        OnlineBatchJobResponse response = onlineBatchService.findById(jobId);
+
+        assertEquals(List.of(), response.recentEvents());
+    }
+
+    @Test
+    void findById_withBlankRecentEvents_returnsEmptyEvents() {
+        Long jobId = onlineBatchJobRepository.seedJob(job -> job.setRecentEvents("   "));
+
+        OnlineBatchJobResponse response = onlineBatchService.findById(jobId);
+
+        assertEquals(List.of(), response.recentEvents());
+    }
+
+    @Test
+    void progressPercent_withZeroTotal_returnsZero() throws Exception {
+        Method method = OnlineBatchServiceImpl.class.getDeclaredMethod("progressPercent", int.class, int.class);
+        method.setAccessible(true);
+
+        int progress = (int) method.invoke(onlineBatchService, 3, 0);
+
+        assertEquals(0, progress);
+    }
+
+    @Test
+    void findAll_returnsJobsSortedByCreatedAtDesc() {
+        Long olderId = onlineBatchJobRepository.seedJob(job -> {
+            job.setJobName("older");
+            job.setCreatedAt(LocalDateTime.now().minusMinutes(1));
+        });
+        Long newerId = onlineBatchJobRepository.seedJob(job -> job.setJobName("newer"));
+
+        List<OnlineBatchJobResponse> jobs = onlineBatchService.findAll();
+
+        assertThat(jobs).extracting(OnlineBatchJobResponse::id).containsSubsequence(newerId, olderId);
+    }
+
+    @Test
+    void findById_whenJobDoesNotExist_throwsNotFound() {
+        assertThatThrownBy(() -> onlineBatchService.findById(999L)).isInstanceOf(AppException.class).satisfies(
+                ex -> assertThat(((AppException) ex).getErrorCode()).isEqualTo(ErrorCode.BATCH_JOB_NOT_FOUND));
+    }
+
+    @Test
+    void findById_withInvalidRecentEvents_throwsUncheckedIOException() {
+        Long jobId = onlineBatchJobRepository.seedJob(job -> job.setRecentEvents("not-json"));
+
+        assertThatThrownBy(() -> onlineBatchService.findById(jobId)).isInstanceOf(UncheckedIOException.class);
+    }
+
+    @Test
+    void start_whenSerializingEventsFails_throwsUncheckedIOException() throws Exception {
+        OnlineBatchJobRepository repository = mock(OnlineBatchJobRepository.class);
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
+        given(objectMapper.writeValueAsString(any())).willThrow(new StubJsonProcessingException("write failed"));
+        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(repository,
+                Executors.newVirtualThreadPerTaskExecutor(), objectMapper);
+
+        try {
+            assertThatThrownBy(() -> service.start(new StartOnlineBatchRequest("broken", 1, null, 0)))
+                    .isInstanceOf(UncheckedIOException.class);
+        } finally {
+            service.shutdown();
+        }
     }
 
     private OnlineBatchJobResponse waitUntilFinished(Long jobId) throws Exception {
@@ -112,6 +208,24 @@ class OnlineBatchServiceTest {
             store.put(copy.getId(), copy);
         }
 
+        Long seedJob(java.util.function.Consumer<OnlineBatchJob> customizer) {
+            OnlineBatchJob job = new OnlineBatchJob();
+            job.setJobName("seed");
+            job.setStatus(BatchJobStatus.ACCEPTED);
+            job.setTotalItems(1);
+            job.setProcessedItems(0);
+            job.setSuccessCount(0);
+            job.setFailureCount(0);
+            job.setProgressPercent(0);
+            job.setProcessingDelayMs(0);
+            LocalDateTime now = LocalDateTime.now();
+            job.setCreatedAt(now);
+            job.setUpdatedAt(now);
+            customizer.accept(job);
+            insert(job);
+            return job.getId();
+        }
+
         private OnlineBatchJob copy(OnlineBatchJob source) {
             OnlineBatchJob copy = new OnlineBatchJob();
             copy.setId(source.getId());
@@ -131,6 +245,12 @@ class OnlineBatchServiceTest {
             copy.setCompletedAt(source.getCompletedAt());
             copy.setUpdatedAt(source.getUpdatedAt());
             return copy;
+        }
+    }
+
+    private static final class StubJsonProcessingException extends JsonProcessingException {
+        StubJsonProcessingException(String message) {
+            super(message);
         }
     }
 }
