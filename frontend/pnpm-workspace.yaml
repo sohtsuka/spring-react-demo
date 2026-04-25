@@ -12,6 +12,8 @@ minimumReleaseAgeExclude:
   - '@typescript-eslint/utils'
   - '@typescript-eslint/visitor-keys'
   - typescript-eslint
+  # Renovate security update: vite@8.0.5
+  - vite@8.0.5
 
 onlyBuiltDependencies:
   - esbuild
