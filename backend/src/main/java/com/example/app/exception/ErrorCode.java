@@ -12,7 +12,8 @@ public enum ErrorCode {
                             HttpStatus.UNAUTHORIZED), FORBIDDEN("FORBIDDEN", "この操作を行う権限がありません", HttpStatus.FORBIDDEN),
 
     // リソース
-    USER_NOT_FOUND("USER_NOT_FOUND", "ユーザーが見つかりません", HttpStatus.NOT_FOUND),
+    USER_NOT_FOUND("USER_NOT_FOUND", "ユーザーが見つかりません", HttpStatus.NOT_FOUND), BATCH_JOB_NOT_FOUND("BATCH_JOB_NOT_FOUND",
+            "バッチジョブが見つかりません", HttpStatus.NOT_FOUND),
 
     // 重複
     USERNAME_ALREADY_EXISTS("USERNAME_ALREADY_EXISTS", "このユーザー名はすでに使用されています",

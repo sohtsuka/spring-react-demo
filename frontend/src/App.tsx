@@ -9,6 +9,7 @@ import { ForbiddenPage } from '@/pages/ForbiddenPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { ManagerPage } from '@/pages/manager/ManagerPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { OnlineBatchDemoPage } from '@/pages/OnlineBatchDemoPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 
 export function App() {
@@ -24,6 +25,7 @@ export function App() {
           <Route element={<Layout />}>
             {/* 全ロール共通 */}
             <Route index element={<DashboardPage />} />
+            <Route path="batch-demo" element={<OnlineBatchDemoPage />} />
             <Route path="profile" element={<ProfilePage />} />
 
             {/* ADMIN / MANAGER のみ */}

@@ -19,6 +19,8 @@
 
 本仕様書は、Vite + React + TypeScript によるフロントエンド SPA と、Java + Spring Boot による RESTful API サーバーで構成される Web アプリケーションの汎用テンプレートを定義する。特定のドメインに依存しない共通技術基盤として使用することを想定している。
 
+本リポジトリには、テンプレート機能に加えて「オンラインバッチ機構」のデモを含む。オンラインバッチデモでは、画面からジョブを受け付け、バックエンドで非同期に逐次処理し、その進捗を API 経由で監視する一連の流れを確認できる。
+
 ### 1.1 システム構成
 
 - **フロントエンド**: SPA (Single Page Application)
@@ -150,9 +152,18 @@ src/
 |---|---|---|---|
 | `/login` | ログイン画面 | 不要 | — |
 | `/` | ダッシュボード | 要 | 全ロール |
+| `/batch-demo` | オンラインバッチデモ | 要 | 全ロール |
 | `/profile` | プロフィール | 要 | 全ロール |
 | `/manager/*` | マネージャー画面 | 要 | ADMIN, MANAGER |
 | `/admin/*` | 管理者画面 | 要 | ADMIN |
+
+### 4.1.1 オンラインバッチデモ画面
+
+- ダッシュボードまたはサイドバーの `オンラインバッチ` から遷移する
+- ジョブ名、処理件数、処理間隔、失敗させる件番を入力してジョブを起動する
+- 起動後はジョブ一覧に追加され、選択したジョブの進捗率、成功件数、失敗件数、処理イベントを確認できる
+- `ACCEPTED` または `RUNNING` のジョブが存在する間、フロントエンドは 1 秒間隔でジョブ一覧・詳細をポーリングする
+- `失敗させる件番` を指定した場合、その件の処理で `FAILED` に遷移し、指定しない場合は全件処理後に `COMPLETED` になる
 
 ### 4.2 状態管理方針
 
@@ -266,6 +277,63 @@ URL パターン:
 - SLF4J + Logback を使用
 - ログレベル: `DEBUG` (dev プロファイル) / `INFO` (prod プロファイル)
 - `HandlerInterceptor` でリクエスト・レスポンスのログを記録 (パスワード等の機密情報はマスク)
+
+### 5.7 オンラインバッチデモ API
+
+デモ用のオンラインバッチはインメモリ管理で実装する。DB 永続化や分散実行は行わず、Spring Boot プロセス内でジョブ状態を保持する。
+
+ジョブ状態:
+
+- `ACCEPTED`: 受け付け直後
+- `RUNNING`: 非同期処理中
+- `COMPLETED`: 全件成功
+- `FAILED`: 指定件で失敗、または処理中断
+
+エンドポイント:
+
+| メソッド | パス | 認証要否 | 説明 |
+|---|---|---|---|
+| GET | `/api/v1/online-batch-jobs` | 要 | ジョブ一覧取得 |
+| GET | `/api/v1/online-batch-jobs/{id}` | 要 | ジョブ詳細取得 |
+| POST | `/api/v1/online-batch-jobs` | 要 | ジョブ起動 |
+
+起動リクエスト例:
+
+```json
+{
+  "jobName": "売上CSV取込デモ",
+  "totalItems": 8,
+  "failureAtItem": null,
+  "processingDelayMs": 400
+}
+```
+
+ジョブ詳細レスポンス例:
+
+```json
+{
+  "data": {
+    "id": 1,
+    "jobName": "売上CSV取込デモ",
+    "status": "RUNNING",
+    "totalItems": 8,
+    "processedItems": 3,
+    "successCount": 3,
+    "failureCount": 0,
+    "progressPercent": 37,
+    "failureAtItem": null,
+    "processingDelayMs": 400,
+    "currentItem": "データ4/8",
+    "createdAt": "2026-04-25T10:00:00",
+    "startedAt": "2026-04-25T10:00:01",
+    "completedAt": null,
+    "recentEvents": [
+      "2026-04-25T10:00:03 データ3/8 の処理が完了しました",
+      "2026-04-25T10:00:02 データ3/8 の処理を開始しました"
+    ]
+  }
+}
+```
 
 ---
 
@@ -518,11 +586,31 @@ volumes:
 docker compose up -d
 
 # 2. バックエンド起動 (Flyway マイグレーション + 初期データ投入が自動実行)
+cd backend
 ./gradlew bootRun --args='--spring.profiles.active=dev'
 
 # 3. フロントエンド起動
+cd ../frontend
+pnpm install
 pnpm dev
 ```
+
+起動後のアクセス先:
+
+- フロントエンド: `http://localhost:5173`
+- バックエンド API: `http://localhost:8080/api/v1`
+
+オンラインバッチデモ確認手順:
+
+1. ブラウザで `http://localhost:5173` を開き、ログインする
+2. ダッシュボードの `デモを開く` またはサイドバーの `オンラインバッチ` から `/batch-demo` へ遷移する
+3. `ジョブ名`、`処理件数`、`処理間隔(ms)` を設定し、必要であれば `失敗させる件番` を入力する
+4. `バッチを起動` を押し、ジョブ一覧とジョブ詳細でステータス遷移とイベントログを確認する
+
+補足:
+
+- バックエンドのジョブ情報はインメモリ保持のため、Spring Boot を再起動すると消える
+- `失敗させる件番` を空にすると正常完了デモ、`1` 以上を入れると異常終了デモを確認できる
 
 ### 9.6 pnpm 設定 (`pnpm-workspace.yaml`)
 
@@ -715,6 +803,9 @@ pnpm exec playwright test
 | POST | `/api/v1/auth/login` | 不要 | — | ログイン |
 | POST | `/api/v1/auth/logout` | 要 | 全ロール | ログアウト |
 | GET | `/api/v1/auth/me` | 要 | 全ロール | 自ユーザー情報取得 |
+| GET | `/api/v1/online-batch-jobs` | 要 | 全ロール | オンラインバッチジョブ一覧取得 |
+| GET | `/api/v1/online-batch-jobs/{id}` | 要 | 全ロール | オンラインバッチジョブ詳細取得 |
+| POST | `/api/v1/online-batch-jobs` | 要 | 全ロール | オンラインバッチジョブ起動 |
 | GET | `/api/v1/users` | 要 | ADMIN, MANAGER | ユーザー一覧取得 |
 | GET | `/api/v1/users/{id}` | 要 | ADMIN, MANAGER | ユーザー詳細取得 |
 | POST | `/api/v1/users` | 要 | ADMIN | ユーザー作成 |

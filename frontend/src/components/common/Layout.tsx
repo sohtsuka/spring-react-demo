@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router'
-import { LayoutDashboard, LogOut, Settings, User, Users } from 'lucide-react'
+import { LayoutDashboard, LogOut, Settings, TimerReset, User, Users } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -15,6 +15,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/', label: 'ダッシュボード', icon: LayoutDashboard },
+  { href: '/batch-demo', label: 'オンラインバッチ', icon: TimerReset },
   { href: '/profile', label: 'プロフィール', icon: User },
   {
     href: '/manager',

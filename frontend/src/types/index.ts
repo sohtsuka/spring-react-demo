@@ -71,3 +71,30 @@ export interface LoginRequest {
   username: string
   password: string
 }
+
+export type BatchJobStatus = 'ACCEPTED' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+
+export interface OnlineBatchJob {
+  id: number
+  jobName: string
+  status: BatchJobStatus
+  totalItems: number
+  processedItems: number
+  successCount: number
+  failureCount: number
+  progressPercent: number
+  failureAtItem: number | null
+  processingDelayMs: number
+  currentItem: string | null
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
+  recentEvents: string[]
+}
+
+export interface StartOnlineBatchRequest {
+  jobName: string
+  totalItems: number
+  failureAtItem: number | null
+  processingDelayMs: number
+}
