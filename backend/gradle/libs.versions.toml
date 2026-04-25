@@ -1,7 +1,7 @@
 [versions]
 springBoot = "4.0.5"
 mybatisSpringBoot = "4.0.1"
-bucket4j = "8.17.0"
+bucket4j = "8.18.0"
 bouncyCastle = "1.84"
 testcontainers = "2.0.4"
 spotless = "8.4.0"
