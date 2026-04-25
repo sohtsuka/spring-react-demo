@@ -49,4 +49,27 @@ class CustomUserDetailsTest {
 
         assertThat(details.isAccountNonLocked()).isFalse();
     }
+
+    @Test
+    void accessors_returnWrappedUserValues() {
+        User user = buildUser();
+        CustomUserDetails details = new CustomUserDetails(user);
+
+        assertThat(details.getUser()).isSameAs(user);
+        assertThat(details.getAuthorities()).extracting("authority").containsExactly("ROLE_USER");
+        assertThat(details.getPassword()).isEqualTo("hashed");
+        assertThat(details.getUsername()).isEqualTo("testuser");
+        assertThat(details.isAccountNonExpired()).isTrue();
+        assertThat(details.isCredentialsNonExpired()).isTrue();
+        assertThat(details.isEnabled()).isTrue();
+    }
+
+    @Test
+    void isEnabled_whenUserDisabled_returnsFalse() {
+        User user = buildUser();
+        user.setEnabled(false);
+        CustomUserDetails details = new CustomUserDetails(user);
+
+        assertThat(details.isEnabled()).isFalse();
+    }
 }
