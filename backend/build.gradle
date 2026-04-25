@@ -1,9 +1,9 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.6'
-    id 'io.spring.dependency-management' version '1.1.7'
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.dependency.management)
     id 'jacoco'
-    id 'org.owasp.dependencycheck' version '12.2.1'
+    alias(libs.plugins.dependencycheck)
     id 'checkstyle'
     alias(libs.plugins.spotless)
     alias(libs.plugins.spotbugs.plugin)
@@ -140,7 +140,7 @@ dependencyCheck {
 }
 
 jacoco {
-    toolVersion = "0.8.14"
+    toolVersion = libs.versions.jacoco.get()
 }
 
 jacocoTestReport {
