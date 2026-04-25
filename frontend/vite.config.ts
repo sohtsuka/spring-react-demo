@@ -23,6 +23,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     exclude: ['**/node_modules/**', '**/e2e/**'],
+    reporters: ['default', 'junit'],
+    outputFile: {
+      junit: './test-results/junit.xml',
+    },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
