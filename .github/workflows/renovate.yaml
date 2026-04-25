@@ -2,6 +2,8 @@ name: Renovate
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "10 15 * * *"
 
 jobs:
   renovate:
@@ -20,9 +22,11 @@ jobs:
         with:
           # 以下の Read and write が必要
           # Commit statuses, Contents, Issues, Pull requests
+          # 以下の Read が必要
+          # Dependabot alerts, Secret scanning alerts, Security events
           token: ${{ secrets.RENOVATE_TOKEN }}
           configurationFile: renovate.json
-          renovate-version: 43.99.0@sha256:aae697086b93427dcde46eb92e08e334b018946ce19339bf044ce971ca1626e2
+          renovate-version: 43.128.1@sha256:b4befe2e244bea27cf685ee6270478df87020ce61f6dfbd2e3966db2cfdee6b4
         env:
           # Explicitly target this repository to avoid "No repositories found" in self-hosted mode.
           RENOVATE_REPOSITORIES: ${{ github.repository }}
