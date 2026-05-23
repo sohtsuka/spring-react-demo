@@ -794,6 +794,16 @@ pnpm test
 pnpm exec playwright test
 ```
 
+Playwright のブラウザをまだインストールしていない場合は以下を実行
+
+```bash
+sudo pnpm exec playwright install-deps
+pnpm exec playwright install
+```
+
+開発用ユーザーで `sudo` できない場合は、 `pnpm exec playwright install-deps --dry-run` を実行し、出力されるインストールコマンドを `sudo` できるユーザーで実行する。
+
+
 ---
 
 ## Appendix A: テンプレート API エンドポイント一覧
