@@ -7,3 +7,6 @@ onlyBuiltDependencies:
 trustPolicy: no-downgrade
 
 trustPolicyIgnoreAfter: 43200
+minimumReleaseAgeExclude:
+  # Renovate security update: vite@8.0.16
+  - vite@8.0.16
