@@ -7,3 +7,6 @@ onlyBuiltDependencies:
 trustPolicy: no-downgrade
 
 trustPolicyIgnoreAfter: 43200
+minimumReleaseAgeExclude:
+  # Renovate security update: postcss@8.5.23
+  - postcss@8.5.23
