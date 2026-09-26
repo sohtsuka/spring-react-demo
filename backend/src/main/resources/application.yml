@@ -23,6 +23,10 @@ mybatis:
 app:
   security:
     pepper: ${APP_PEPPER}
+    # アプリの手前にある信頼できるリバースプロキシの段数。
+    # 0 = プロキシ無し (X-Forwarded-For を信用しない)。N 段のときは XFF の右から N 番目を
+    # クライアント IP として使うため、攻撃者が前方に足した値では レート制限を迂回できない。
+    trusted-proxy-count: ${TRUSTED_PROXY_COUNT:0}
 
 server:
   port: 8080
