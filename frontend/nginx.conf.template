@@ -5,6 +5,10 @@
 # 置換されるのは環境変数として定義された名前だけなので、$host や $uri はそのまま残る。
 #   HTTPS_PORT: 外部に公開している HTTPS のポート。本番 (443) では 443 を指定する。
 
+# バージョンを出さない。conf.d/ は http コンテキストに include されるため、
+# ここに書くと HTTP のリダイレクト応答も含めて全 server ブロックに効く
+server_tokens off;
+
 server {
     listen 80;
     server_name _;
@@ -38,7 +42,6 @@ server {
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header Cross-Origin-Opener-Policy "same-origin" always;
     add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
-    server_tokens off;
 
     # ---- API ----
     location /api/ {
