@@ -1,0 +1,84 @@
+# 本番構成の SPA 配信 + API へのリバースプロキシ。
+# 自己署名証明書で TLS を終端するため、本番プロファイル (Secure Cookie / HSTS) をそのまま検証できる。
+#
+# nginx:alpine の entrypoint が envsubst でこのテンプレートを展開する。
+# 置換されるのは環境変数として定義された名前だけなので、$host や $uri はそのまま残る。
+#   HTTPS_PORT: 外部に公開している HTTPS のポート。本番 (443) では 443 を指定する。
+
+server {
+    listen 80;
+    server_name _;
+    # 本番同様、HTTP は HTTPS へ寄せる。
+    # Host ヘッダーのポートは HTTP 側のものなので使えず、公開している HTTPS のポートを渡す。
+    return 301 https://$host:${HTTPS_PORT}$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name _;
+
+    ssl_certificate     /etc/nginx/tls/server.crt;
+    ssl_certificate_key /etc/nginx/tls/server.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # ---- セキュリティヘッダー ----
+    # SPA 本体向け。ビルド成果物に inline script は無いため script-src は 'self' で足りる。
+    # Radix UI が配置のため style 属性を動的に付けるので、style 属性だけを style-src-attr で
+    # 許可し、<style> 要素と外部 CSS は style-src 'self' のまま厳格に保つ
+    # (値が実行時に変わるため hash や nonce では対応できない)。
+    add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+    server_tokens off;
+
+    # ---- API ----
+    location /api/ {
+        proxy_pass http://backend:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # アプリのレート制限は「信頼するプロキシ段数 = 1」で右端を読む。
+        # $proxy_add_x_forwarded_for はクライアントが送った値の右に接続元を足すため、
+        # 偽装された値は左に残り無視される。
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        # API 側が返すヘッダー (CSP など) をそのまま通す
+        proxy_pass_request_headers on;
+    }
+
+    # ---- 静的ファイル ----
+    # ハッシュ付きファイル名なので長期キャッシュにできる
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        # location を分けると上位の add_header が効かないため、必要なものを再掲する
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        try_files $uri =404;
+    }
+
+    # ---- SPA のクライアントルーティング ----
+    location / {
+        # index.html はハッシュ付きの asset を参照するため、古い内容を掴ませない
+        add_header Cache-Control "no-cache" always;
+        # location を分けると上位の add_header が効かないため、必要なものを再掲する
+        add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+        try_files $uri $uri/ /index.html;
+    }
+}
