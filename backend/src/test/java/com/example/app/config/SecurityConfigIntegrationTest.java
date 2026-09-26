@@ -3,6 +3,7 @@ package com.example.app.config;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -64,5 +65,15 @@ class SecurityConfigIntegrationTest {
         mockMvc.perform(get("/api/v1/users").with(user("testuser").roles("USER"))).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"))
                 .andExpect(jsonPath("$.message").value("この操作を行う権限がありません"));
+    }
+
+    /** API は JSON しか返さないため、ブラウザーが何も読み込まない CSP と埋め込み禁止を返す */
+    @Test
+    void responses_carry_security_headers() throws Exception {
+        mockMvc.perform(get("/api/v1/users"))
+                .andExpect(header().string("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"))
+                .andExpect(header().string("X-Frame-Options", "DENY"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"));
     }
 }

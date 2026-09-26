@@ -79,7 +79,11 @@ public class SecurityConfig {
                 })).headers(headers -> headers.contentTypeOptions(ct -> {
                 }).frameOptions(fo -> fo.deny())
                         .httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31536000).includeSubDomains(true))
-                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)));
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        // この API は JSON しか返さないため、ブラウザーが何も読み込まない CSP にする。
+                        // frame-ancestors は X-Frame-Options: DENY の現代版で、埋め込みも禁止する。
+                        .contentSecurityPolicy(
+                                csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'")));
 
         return http.build();
     }
