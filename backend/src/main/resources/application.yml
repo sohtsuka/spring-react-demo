@@ -13,6 +13,12 @@ spring:
   session:
     timeout: ${SESSION_TIMEOUT:1800}s
 
+  jackson:
+    datatype:
+      enum:
+        # enum を序数 (0, 1, ...) で受け付けない。名前 (ADMIN 等) のみ許可する
+        fail-on-numbers-for-enums: true
+
 mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
