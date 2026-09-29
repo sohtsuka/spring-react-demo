@@ -15,6 +15,8 @@ export class HttpError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly code?: string,
+    public readonly details: { field: string; message: string }[] = [],
   ) {
     super(message)
     this.name = 'HttpError'
@@ -58,7 +60,18 @@ async function request<T>(
   })
 
   if (!response.ok) {
-    throw new HttpError(response.status, response.statusText)
+    const body: unknown = await response.json().catch(() => null)
+    const error = typeof body === 'object' && body !== null ? body : {}
+    const message = 'message' in error && typeof error.message === 'string'
+      ? error.message : response.statusText
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : undefined
+    const details = 'details' in error && Array.isArray(error.details)
+      ? error.details.filter((detail): detail is { field: string; message: string } =>
+          typeof detail === 'object' && detail !== null &&
+          'field' in detail && typeof detail.field === 'string' &&
+          'message' in detail && typeof detail.message === 'string')
+      : []
+    throw new HttpError(response.status, message, code, details)
   }
 
   const contentType = response.headers.get('content-type')

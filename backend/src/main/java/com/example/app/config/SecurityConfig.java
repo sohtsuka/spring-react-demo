@@ -25,6 +25,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
@@ -32,7 +33,9 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.example.app.model.dto.ErrorResponse;
+import com.example.app.repository.UserRepository;
 import com.example.app.security.PepperPasswordEncoder;
+import com.example.app.security.SessionValidationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -51,7 +54,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, UserRepository users) throws Exception {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
 
@@ -60,6 +63,7 @@ public class SecurityConfig {
                 .ignoringRequestMatchers("/api/v1/auth/login").csrfTokenRequestHandler(requestHandler))
                 // レスポンスごとに CSRF クッキーを書き出すフィルター
                 .addFilterAfter(new CsrfCookieFilter(), org.springframework.security.web.csrf.CsrfFilter.class)
+                .addFilterBefore(new SessionValidationFilter(users), AuthorizationFilter.class)
                 .authorizeHttpRequests(auth -> auth.requestMatchers("/api/v1/auth/login").permitAll()
                         .requestMatchers("/api/v1/users/**").hasAnyRole("ADMIN", "MANAGER").anyRequest()
                         .authenticated())

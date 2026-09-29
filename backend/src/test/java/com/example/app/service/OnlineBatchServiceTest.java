@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -67,6 +68,47 @@ class OnlineBatchServiceTest {
         assertEquals(1, failed.successCount());
         assertEquals(1, failed.failureCount());
         assertEquals(50, failed.progressPercent());
+    }
+
+    @Test
+    void recoverInterruptedMarksOnlyUnfinishedJobsFailed() {
+        Long accepted = onlineBatchJobRepository.seedJob(job -> {
+        });
+        Long running = onlineBatchJobRepository.seedJob(job -> job.setStatus(BatchJobStatus.RUNNING));
+        Long completed = onlineBatchJobRepository.seedJob(job -> job.setStatus(BatchJobStatus.COMPLETED));
+
+        onlineBatchService.recoverInterrupted();
+
+        assertThat(onlineBatchService.findById(accepted).status()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(onlineBatchService.findById(running).status()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(onlineBatchService.findById(completed).status()).isEqualTo(BatchJobStatus.COMPLETED);
+        assertThat(onlineBatchService.findById(running).completedAt()).isNotNull();
+    }
+
+    @Test
+    void processingExceptionMarksJobFailed() throws Exception {
+        onlineBatchJobRepository.failNextUpdate.set(true);
+        Long id = onlineBatchService.start(new StartOnlineBatchRequest("exception", 1, null, 0)).id();
+
+        OnlineBatchJobResponse failed = waitUntilFinished(id);
+
+        assertThat(failed.status()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(failed.completedAt()).isNotNull();
+    }
+
+    @Test
+    void failureRecordingExceptionLeavesJobForStartupRecovery() throws Exception {
+        onlineBatchJobRepository.failNextUpdate.set(true);
+        onlineBatchJobRepository.failNextRecovery.set(true);
+        Long id = onlineBatchService.start(new StartOnlineBatchRequest("recovery", 1, null, 0)).id();
+        for (int attempt = 0; attempt < 100 && onlineBatchJobRepository.failNextRecovery.get(); attempt++) {
+            Thread.sleep(10);
+        }
+
+        assertThat(onlineBatchJobRepository.failNextRecovery).isFalse();
+        assertThat(onlineBatchService.findById(id).status()).isEqualTo(BatchJobStatus.ACCEPTED);
+        onlineBatchService.recoverInterrupted();
+        assertThat(onlineBatchService.findById(id).status()).isEqualTo(BatchJobStatus.FAILED);
     }
 
     @Test
@@ -175,6 +217,23 @@ class OnlineBatchServiceTest {
     private static final class InMemoryOnlineBatchJobRepository implements OnlineBatchJobRepository {
         private final ConcurrentMap<Long, OnlineBatchJob> store = new ConcurrentHashMap<>();
         private final AtomicLong sequence = new AtomicLong(0);
+        private final AtomicBoolean failNextUpdate = new AtomicBoolean();
+        private final AtomicBoolean failNextRecovery = new AtomicBoolean();
+
+        @Override
+        public void failIncomplete(Long id, String events) {
+            if (failNextRecovery.compareAndSet(true, false)) {
+                throw new IllegalStateException("simulated recovery failure");
+            }
+            store.values().stream().filter(job -> id == null || id.equals(job.getId())).filter(
+                    job -> job.getStatus() == BatchJobStatus.ACCEPTED || job.getStatus() == BatchJobStatus.RUNNING)
+                    .forEach(job -> {
+                        job.setStatus(BatchJobStatus.FAILED);
+                        job.setCompletedAt(LocalDateTime.now());
+                        job.setRecentEvents(events);
+                        job.setCurrentItem(null);
+                    });
+        }
 
         @Override
         public Optional<OnlineBatchJob> findById(Long id) {
@@ -203,6 +262,9 @@ class OnlineBatchServiceTest {
 
         @Override
         public void update(OnlineBatchJob job) {
+            if (failNextUpdate.compareAndSet(true, false)) {
+                throw new IllegalStateException("simulated update failure");
+            }
             OnlineBatchJob copy = copy(job);
             copy.setUpdatedAt(LocalDateTime.now());
             store.put(copy.getId(), copy);

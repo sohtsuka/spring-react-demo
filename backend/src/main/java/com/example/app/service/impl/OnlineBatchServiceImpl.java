@@ -7,12 +7,16 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import com.example.app.exception.AppException;
@@ -25,7 +29,10 @@ import com.example.app.repository.OnlineBatchJobRepository;
 import com.example.app.service.OnlineBatchService;
 
 @Service
+@DependsOn("flyway")
 public class OnlineBatchServiceImpl implements OnlineBatchService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(OnlineBatchServiceImpl.class);
 
     private static final int DEFAULT_DELAY_MS = 400;
     private static final int MAX_RECENT_EVENTS = 8;
@@ -64,7 +71,20 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
         job.setRecentEvents(toJson(List.of(eventMessage("ジョブを受け付けました"))));
         onlineBatchJobRepository.insert(job);
 
-        executor.submit(() -> process(job.getId()));
+        executor.submit(() -> {
+            try {
+                process(job.getId());
+            } catch (RuntimeException ex) {
+                LOG.error("Batch {} failed", job.getId(), ex);
+                try {
+                    onlineBatchJobRepository.failIncomplete(job.getId(),
+                            toJson(List.of(eventMessage("ジョブの処理に失敗しました"))));
+                } catch (RuntimeException recordingFailure) {
+                    LOG.error("Cannot record failure for batch {}; it will be recovered at restart", job.getId(),
+                            recordingFailure);
+                }
+            }
+        });
         return findById(job.getId());
     }
 
@@ -81,6 +101,12 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
     @PreDestroy
     public void shutdown() {
         executor.shutdownNow();
+    }
+
+    /** 単一APIプロセス構成。新しいジョブを受け付ける前に前回の未完了ジョブを回収する。 */
+    @PostConstruct
+    public void recoverInterrupted() {
+        onlineBatchJobRepository.failIncomplete(null, toJson(List.of(eventMessage("再起動により未完了ジョブを失敗として回収しました"))));
     }
 
     private void validateRequest(StartOnlineBatchRequest request) {

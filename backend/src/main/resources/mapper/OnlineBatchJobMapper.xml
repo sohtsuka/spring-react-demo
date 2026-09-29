@@ -4,6 +4,14 @@
 
 <mapper namespace="com.example.app.repository.OnlineBatchJobRepository">
 
+    <update id="failIncomplete">
+        UPDATE online_batch_jobs
+        SET status = 'FAILED', current_item = NULL, recent_events = #{events},
+            completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE status IN ('ACCEPTED', 'RUNNING')
+        <if test="id != null">AND id = #{id}</if>
+    </update>
+
     <resultMap id="OnlineBatchJobResultMap" type="com.example.app.model.entity.OnlineBatchJob">
         <id property="id" column="id"/>
         <result property="jobName" column="job_name"/>

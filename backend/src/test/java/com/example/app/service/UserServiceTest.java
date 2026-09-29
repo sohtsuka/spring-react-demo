@@ -56,6 +56,29 @@ class UserServiceTest {
     }
 
     @Test
+    void findAll_rejectsInvalidPagingBeforeDatabaseLookup() {
+        for (int[] paging : List.of(new int[]{0, 20}, new int[]{1, 0}, new int[]{1, 101}, new int[]{1, -1})) {
+            assertThatThrownBy(() -> userService.findAll(paging[0], paging[1])).isInstanceOf(AppException.class)
+                    .satisfies(
+                            ex -> assertThat(((AppException) ex).getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
+        }
+        then(userRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void findAll_usesWideOffsetAtMaximumPageAndSize() {
+        long offset = ((long) Integer.MAX_VALUE - 1) * 100;
+        given(userRepository.findAll(offset, 100)).willReturn(List.of());
+        given(userRepository.count()).willReturn(1L);
+
+        PagedResponse<UserResponse> result = userService.findAll(Integer.MAX_VALUE, 100);
+
+        assertThat(result.data()).isEmpty();
+        assertThat(result.pagination().page()).isEqualTo(Integer.MAX_VALUE);
+        then(userRepository).should().findAll(offset, 100);
+    }
+
+    @Test
     void findById_existingUser_returnsUserResponse() {
         given(userRepository.findById(1L)).willReturn(Optional.of(buildUser()));
 

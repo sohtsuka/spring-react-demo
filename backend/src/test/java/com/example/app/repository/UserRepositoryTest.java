@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -15,8 +18,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
+import com.example.app.model.dto.UpdateUserRequest;
 import com.example.app.model.entity.User;
 import com.example.app.model.enums.UserRole;
+import com.example.app.service.UserService;
 
 // @MybatisTest は Spring Boot 4 で削除された FlywayAutoConfiguration を参照するため使用不可
 // @SpringBootTest(webEnvironment=NONE) + Testcontainers で代替する
@@ -36,6 +41,61 @@ class UserRepositoryTest {
 
     @Autowired
     UserRepository userRepository;
+
+    @Autowired
+    UserService userService;
+
+    @Test
+    void concurrentPartialUpdatesPreserveBothChanges() throws Exception {
+        User user = buildUser("concurrent-update", "concurrent-update@example.com");
+        userRepository.insert(user);
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var disable = executor.submit(() -> {
+                start.await();
+                return userService.update(user.getId(), new UpdateUserRequest(null, null, null, false));
+            });
+            var email = executor.submit(() -> {
+                start.await();
+                return userService.update(user.getId(),
+                        new UpdateUserRequest(null, "updated-concurrent@example.com", null, null));
+            });
+            start.countDown();
+            disable.get(10, TimeUnit.SECONDS);
+            email.get(10, TimeUnit.SECONDS);
+        }
+        User finalUser = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(finalUser.isEnabled()).isFalse();
+        assertThat(finalUser.getEmail()).isEqualTo("updated-concurrent@example.com");
+    }
+
+    @Test
+    void concurrentLoginFailuresReachLockThreshold() throws Exception {
+        User user = buildUser("concurrent-login", "concurrent-login@example.com");
+        userRepository.insert(user);
+        for (int i = 0; i < 8; i++) {
+            userRepository.incrementFailedLoginAttempts(user.getUsername());
+        }
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> {
+                start.await();
+                userService.recordLoginFailure(user.getUsername());
+                return null;
+            });
+            var second = executor.submit(() -> {
+                start.await();
+                userService.recordLoginFailure(user.getUsername());
+                return null;
+            });
+            start.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+        }
+        User finalUser = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(finalUser.getFailedLoginAttempts()).isEqualTo(10);
+        assertThat(finalUser.getLockedUntil()).isNotNull();
+    }
 
     @Test
     void insert_and_findById() {

@@ -255,16 +255,22 @@ URL パターン:
 | 201 Created | 新規作成成功 |
 | 204 No Content | 削除成功 |
 | 400 Bad Request | バリデーションエラー・不正なリクエスト |
-| 401 Unauthorized | 未認証 |
+| 401 Unauthorized | 未認証・認証失敗・アカウントのロックや無効化 |
 | 403 Forbidden | 権限不足 |
-| 404 Not Found | リソース未存在 |
+| 404 Not Found | リソース未存在・認証と認可を通過した未知のパス |
 | 409 Conflict | 重複リソース |
+| 415 Unsupported Media Type | JSON 本文を受け取る API の非対応 Content-Type |
+| 429 Too Many Requests | ログインのレート制限超過 |
 | 500 Internal Server Error | サーバー内部エラー |
+
+API クライアントはエラー本文の `code` / `message` / `details` を `HttpError` に保持する。ログイン画面は `401 + ACCOUNT_LOCKED` でロックの案内を表示し、`401 + ACCOUNT_DISABLED` と `429 + RATE_LIMIT_EXCEEDED` では API のメッセージを表示する。その他の 401 は認証失敗として扱う。
 
 ### 5.4 バリデーション
 
 - リクエスト DTO に `@Valid` + Jakarta Bean Validation アノテーションを付与
 - `@RestControllerAdvice` + `@ExceptionHandler` でバリデーション例外を共通エラーフォーマットに変換
+- ユーザー一覧は `page >= 1`、`1 <= size <= 100` (既定は 1 / 20)。offset は long で計算する。範囲外・変換できないクエリやパスの値は `400 VALIDATION_ERROR`
+- ユーザーの部分更新とログイン失敗の記録は対象行を `FOR UPDATE` でロックし、現在値の読み取りと更新を同じトランザクションで行う
 
 ### 5.5 例外ハンドリング
 
@@ -280,14 +286,16 @@ URL パターン:
 
 ### 5.7 オンラインバッチデモ API
 
-デモ用のオンラインバッチは PostgreSQL の `online_batch_jobs` テーブルで状態管理する。ジョブ受付時にレコードを作成し、非同期処理の進行に応じて同一レコードを更新する。分散実行やワーカープール制御までは含めず、単一 Spring Boot プロセス内で非同期処理を実行する。
+デモ用のオンラインバッチは PostgreSQL の `online_batch_jobs` テーブルで状態管理する。ジョブ受付時にレコードを作成し、非同期処理の進行に応じて同一レコードを更新する。同じ DB を使う API は単一 Spring Boot プロセスで動かす。
+
+処理例外は FAILED として記録する。DB 障害で失敗記録も保存できなかった場合はログに残し、次回起動時に回収する。起動時は要求受付の前に ACCEPTED / RUNNING を FAILED に変更し、完了時刻・回収イベントを保存する。進捗値と既に終端状態のジョブは保持する。複数 API プロセスの分散実行やジョブ所有権管理は対象外。
 
 ジョブ状態:
 
 - `ACCEPTED`: 受け付け直後
 - `RUNNING`: 非同期処理中
 - `COMPLETED`: 全件成功
-- `FAILED`: 指定件で失敗、または処理中断
+- `FAILED`: 指定件で失敗、処理例外・中断、または再起動時の未完了ジョブ回収
 
 エンドポイント:
 
@@ -422,6 +430,10 @@ COMMENT ON COLUMN users.enabled     IS 'アカウント有効フラグ';
 | タイムアウト | 30 分 (アイドルタイム) |
 | セッション固定攻撃対策 | ログイン後に `sessionFixation().newSession()` でセッション ID 再生成 |
 
+認証済み要求の認可前に、`SessionValidationFilter` が現在のユーザーを DB から照合する。削除・無効化・有効なアカウントロック、またはロール・ユーザー名・パスワードの変更を検出すると既存セッションを破棄する。DB 照合の失敗は 500 として要求を止める。
+
+検出は既存セッションの次の要求時に行う。変更時に全セッションを走査する方式や変更履歴による不可逆な失効は含まない。状態変更後、次の要求までに元の状態へ戻した場合 (ABA) は検出対象外。有効なセッションの `/auth/me` は保存したスナップショットを返す。
+
 ### 7.3 パスワード管理
 
 | 項目 | 設定値 |
@@ -475,6 +487,7 @@ public ResponseEntity<Void> deleteUser(@PathVariable Long id) { ... }
 - ログイン失敗 10 回連続でアカウントを一時ロック
 - ロック解除: 一定時間経過後に自動解除 (デフォルト 30 分)、または管理者による手動解除
 - `users` テーブルに `failed_login_attempts` / `locked_until` カラムを追加して管理
+- 対象ユーザーを行ロックしてから現在の失敗回数を読み、加算とロック判定を同じトランザクションで行う。並行した失敗でも 10 回到達時にロックする
 
 ---
 

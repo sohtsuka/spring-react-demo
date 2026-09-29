@@ -79,6 +79,29 @@ class OnlineBatchJobRepositoryTest {
         assertThat(jobs.get(0).getJobName()).isEqualTo("後続ジョブ");
     }
 
+    @Test
+    void failIncompleteOnlyChangesAcceptedAndRunningJobs() {
+        OnlineBatchJob accepted = buildJob();
+        onlineBatchJobRepository.insert(accepted);
+        OnlineBatchJob running = buildJob();
+        running.setStatus(BatchJobStatus.RUNNING);
+        onlineBatchJobRepository.insert(running);
+        OnlineBatchJob completed = buildJob();
+        completed.setStatus(BatchJobStatus.COMPLETED);
+        onlineBatchJobRepository.insert(completed);
+
+        onlineBatchJobRepository.failIncomplete(null, "[\"recovered\"]");
+
+        OnlineBatchJob recovered = onlineBatchJobRepository.findById(accepted.getId()).orElseThrow();
+        assertThat(recovered.getStatus()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(recovered.getCompletedAt()).isNotNull();
+        assertThat(recovered.getRecentEvents()).isEqualTo("[\"recovered\"]");
+        assertThat(onlineBatchJobRepository.findById(running.getId()).orElseThrow().getStatus())
+                .isEqualTo(BatchJobStatus.FAILED);
+        assertThat(onlineBatchJobRepository.findById(completed.getId()).orElseThrow().getStatus())
+                .isEqualTo(BatchJobStatus.COMPLETED);
+    }
+
     private OnlineBatchJob buildJob() {
         OnlineBatchJob job = new OnlineBatchJob();
         job.setJobName("CSV取込");

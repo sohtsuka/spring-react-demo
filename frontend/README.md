@@ -2,6 +2,8 @@
 
 Vite + React + TypeScript による SPA フロントエンドです。
 
+APIのエラー本文は `HttpError` の `code` / `message` / `details` に保持します。ログイン画面はHTTPステータスとcodeを組み合わせ、401の `ACCOUNT_LOCKED` をロック案内、`ACCOUNT_DISABLED` を無効化の案内として表示します。429の `RATE_LIMIT_EXCEEDED` もAPIのメッセージを表示します。この契約はMSWでAPIクライアント・useAuth・LoginPageを通して検証します。
+
 ## 前提条件
 
 - Node.js 24.x (LTS)
@@ -67,12 +69,12 @@ pnpm e2e:ui
 
 ```
 src/
-├── api/            API クライアント関数 (axios ラッパー)
+├── api/            API クライアント関数 (fetch ラッパー)
 ├── components/
 │   ├── ui/         shadcn/ui コンポーネント
 │   └── common/     ProtectedRoute, RoleProtectedRoute, Layout
 ├── hooks/          カスタムフック (useAuth, useToast)
-├── lib/            axios インスタンス, QueryClient, utils
+├── lib/            fetch ラッパーと HttpError, QueryClient, utils
 ├── pages/          ページコンポーネント
 │   ├── admin/      管理者画面 (ADMIN ロール専用)
 │   └── manager/    マネージャー画面 (ADMIN / MANAGER ロール)

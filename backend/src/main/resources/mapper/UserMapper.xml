@@ -4,6 +4,14 @@
 
 <mapper namespace="com.example.app.repository.UserRepository">
 
+    <select id="lockById" resultType="long">
+        SELECT id FROM users WHERE id = #{id} FOR UPDATE
+    </select>
+
+    <select id="lockByUsername" resultType="long">
+        SELECT id FROM users WHERE username = #{username} FOR UPDATE
+    </select>
+
     <resultMap id="UserResultMap" type="com.example.app.model.entity.User">
         <id     property="id"                   column="id"/>
         <result property="username"             column="username"/>
