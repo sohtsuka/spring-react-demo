@@ -26,6 +26,10 @@ public enum ErrorCode {
     // レート制限
     RATE_LIMIT_EXCEEDED("RATE_LIMIT_EXCEEDED", "リクエストが多すぎます。しばらく待ってから再試行してください", HttpStatus.TOO_MANY_REQUESTS),
 
+    BATCH_USER_LIMIT_EXCEEDED("BATCH_USER_LIMIT_EXCEEDED", "バッチの利用上限です。しばらく待って再試行してください",
+            HttpStatus.TOO_MANY_REQUESTS), BATCH_CAPACITY_EXCEEDED("BATCH_CAPACITY_EXCEEDED",
+                    "バッチが混み合っています。しばらく待って再試行してください", HttpStatus.SERVICE_UNAVAILABLE),
+
     // サーバーエラー
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "サーバー内部エラーが発生しました", HttpStatus.INTERNAL_SERVER_ERROR);
 

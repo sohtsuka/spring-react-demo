@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -16,16 +17,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.Assert;
 
 import com.example.app.exception.AppException;
 import com.example.app.exception.ErrorCode;
 import com.example.app.model.dto.OnlineBatchJobResponse;
+import com.example.app.model.dto.PagedResponse;
 import com.example.app.model.dto.StartOnlineBatchRequest;
 import com.example.app.model.entity.OnlineBatchJob;
 import com.example.app.model.enums.BatchJobStatus;
 import com.example.app.repository.OnlineBatchJobRepository;
+import com.example.app.service.BatchAdmission;
 import com.example.app.service.OnlineBatchService;
 
 @Service
@@ -41,22 +50,72 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
     private final ExecutorService executor;
     private final ObjectMapper objectMapper;
 
+    private final BatchAdmission admission;
+    private final TransactionOperations transactions;
+    private final int historyDays;
+    private final int maxHistory;
+    private final Object historyLock = new Object();
+
     @Autowired
-    public OnlineBatchServiceImpl(OnlineBatchJobRepository onlineBatchJobRepository) {
-        this(onlineBatchJobRepository, Executors.newVirtualThreadPerTaskExecutor(), new ObjectMapper());
+    public OnlineBatchServiceImpl(OnlineBatchJobRepository onlineBatchJobRepository, BatchAdmission admission,
+            PlatformTransactionManager transactionManager, @Value("${app.batch.history-days:7}") int historyDays,
+            @Value("${app.batch.max-history:1000}") int maxHistory) {
+        this(onlineBatchJobRepository, Executors.newVirtualThreadPerTaskExecutor(), new ObjectMapper(), admission,
+                new TransactionTemplate(transactionManager), historyDays, maxHistory);
     }
 
     public OnlineBatchServiceImpl(OnlineBatchJobRepository onlineBatchJobRepository, ExecutorService executor,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper, BatchAdmission admission, TransactionOperations transactions, int historyDays,
+            int maxHistory) {
+        Assert.isTrue(historyDays > 0 && maxHistory > 0, "History limits must be positive");
         this.onlineBatchJobRepository = onlineBatchJobRepository;
         this.executor = executor;
         this.objectMapper = objectMapper;
+        this.admission = admission;
+        this.transactions = transactions;
+        this.historyDays = historyDays;
+        this.maxHistory = maxHistory;
     }
 
     @Override
-    public OnlineBatchJobResponse start(StartOnlineBatchRequest request) {
+    public OnlineBatchJobResponse start(long userId, StartOnlineBatchRequest request) {
         validateRequest(request);
+        BatchAdmission.Permit permit = admission.acquire(userId);
+        OnlineBatchJobResponse accepted;
+        try {
+            // 単一プロセス内で保持枠確認と INSERT を直列化し、コミット後にのみ実行する。
+            synchronized (historyLock) {
+                accepted = transactions.execute(status -> {
+                    onlineBatchJobRepository.pruneHistory(LocalDateTime.now().minusDays(historyDays), maxHistory - 1);
+                    if (onlineBatchJobRepository.count() >= maxHistory) {
+                        throw new AppException(ErrorCode.BATCH_CAPACITY_EXCEEDED);
+                    }
+                    return insert(request);
+                });
+            }
+        } catch (RuntimeException ex) {
+            permit.close();
+            throw ex;
+        }
+        try {
+            executor.execute(() -> {
+                try (permit) {
+                    try {
+                        process(accepted.id());
+                    } catch (RuntimeException ex) {
+                        recordFailure(accepted.id(), ex);
+                    }
+                }
+            });
+        } catch (RejectedExecutionException ex) {
+            permit.close();
+            recordFailure(accepted.id(), ex);
+            throw new AppException(ErrorCode.BATCH_CAPACITY_EXCEEDED);
+        }
+        return accepted;
+    }
 
+    private OnlineBatchJobResponse insert(StartOnlineBatchRequest request) {
         OnlineBatchJob job = new OnlineBatchJob();
         job.setJobName(request.jobName());
         job.setStatus(BatchJobStatus.ACCEPTED);
@@ -70,27 +129,34 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
         job.setCurrentItem(null);
         job.setRecentEvents(toJson(List.of(eventMessage("ジョブを受け付けました"))));
         onlineBatchJobRepository.insert(job);
-
-        executor.submit(() -> {
-            try {
-                process(job.getId());
-            } catch (RuntimeException ex) {
-                LOG.error("Batch {} failed", job.getId(), ex);
-                try {
-                    onlineBatchJobRepository.failIncomplete(job.getId(),
-                            toJson(List.of(eventMessage("ジョブの処理に失敗しました"))));
-                } catch (RuntimeException recordingFailure) {
-                    LOG.error("Cannot record failure for batch {}; it will be recovered at restart", job.getId(),
-                            recordingFailure);
-                }
-            }
-        });
         return findById(job.getId());
     }
 
+    private void recordFailure(Long jobId, RuntimeException ex) {
+        LOG.error("Batch {} failed", jobId, ex);
+        try {
+            onlineBatchJobRepository.failIncomplete(jobId, toJson(List.of(eventMessage("ジョブの処理に失敗しました"))));
+        } catch (RuntimeException recordingFailure) {
+            LOG.error("Cannot record failure for batch {}; it will be recovered at restart", jobId, recordingFailure);
+        }
+    }
+
     @Override
-    public List<OnlineBatchJobResponse> findAll() {
-        return onlineBatchJobRepository.findAll().stream().map(this::toResponse).toList();
+    public PagedResponse<OnlineBatchJobResponse> findAll(int page, int size) {
+        if (page < 1 || size < 1 || size > 100) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+        List<OnlineBatchJobResponse> jobs = onlineBatchJobRepository.findAll(((long) page - 1) * size, size).stream()
+                .map(this::toResponse).toList();
+        return PagedResponse.of(jobs, page, size, onlineBatchJobRepository.count());
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void cleanHistory() {
+        synchronized (historyLock) {
+            transactions.executeWithoutResult(status -> onlineBatchJobRepository
+                    .pruneHistory(LocalDateTime.now().minusDays(historyDays), maxHistory));
+        }
     }
 
     @Override
@@ -100,6 +166,7 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
 
     @PreDestroy
     public void shutdown() {
+        admission.stop();
         executor.shutdownNow();
     }
 
@@ -107,6 +174,7 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
     @PostConstruct
     public void recoverInterrupted() {
         onlineBatchJobRepository.failIncomplete(null, toJson(List.of(eventMessage("再起動により未完了ジョブを失敗として回収しました"))));
+        cleanHistory();
     }
 
     private void validateRequest(StartOnlineBatchRequest request) {

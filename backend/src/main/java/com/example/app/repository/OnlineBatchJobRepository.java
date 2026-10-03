@@ -1,5 +1,6 @@
 package com.example.app.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,7 +16,11 @@ public interface OnlineBatchJobRepository {
 
     Optional<OnlineBatchJob> findById(@Param("id") Long id);
 
-    List<OnlineBatchJob> findAll();
+    List<OnlineBatchJob> findAll(@Param("offset") long offset, @Param("limit") int limit);
+
+    long count();
+
+    void pruneHistory(@Param("cutoff") LocalDateTime cutoff, @Param("maxRows") int maxRows);
 
     void insert(OnlineBatchJob job);
 

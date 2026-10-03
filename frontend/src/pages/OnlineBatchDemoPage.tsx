@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, RefreshCw } from 'lucide-react'
+import { HttpError } from '@/lib/api'
 import { onlineBatchApi } from '@/api/onlineBatch'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,18 +35,16 @@ export function OnlineBatchDemoPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [form, setForm] = useState(defaultForm)
+  const [page, setPage] = useState(1)
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
 
   const jobsQuery = useQuery({
-    queryKey: ['online-batch-jobs'],
-    queryFn: onlineBatchApi.getJobs,
-    refetchInterval: (query) => {
-      const jobs = query.state.data
-      return jobs?.some((job) => isActiveStatus(job.status)) ? 1000 : false
-    },
+    queryKey: ['online-batch-jobs', page],
+    queryFn: () => onlineBatchApi.getJobs(page),
+    refetchInterval: 5000,
   })
 
-  const resolvedSelectedJobId = selectedJobId ?? jobsQuery.data?.[0]?.id ?? null
+  const resolvedSelectedJobId = selectedJobId ?? jobsQuery.data?.data[0]?.id ?? null
 
   const selectedJobQuery = useQuery({
     queryKey: ['online-batch-job', resolvedSelectedJobId],
@@ -68,10 +67,12 @@ export function OnlineBatchDemoPage() {
         description: `${job.jobName} をバックグラウンドで実行しています`,
       })
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: 'エラー',
-        description: 'オンラインバッチの起動に失敗しました',
+        description: error instanceof HttpError && [429, 503].includes(error.status)
+          ? '現在はジョブを受け付けられません。しばらく待ってから再実行してください'
+          : 'オンラインバッチの起動に失敗しました',
         variant: 'destructive',
       })
     },
@@ -182,7 +183,7 @@ export function OnlineBatchDemoPage() {
               <div>
                 <CardTitle>ジョブ一覧</CardTitle>
                 <CardDescription>
-                  新しい順に表示しています。進行中のジョブがある間は自動更新します
+                  新しい順に20件ずつ表示し、定期更新します。完了した古い履歴は自動削除されます
                 </CardDescription>
               </div>
               <Button
@@ -199,11 +200,11 @@ export function OnlineBatchDemoPage() {
               {jobsQuery.isError && (
                 <p className="text-sm text-destructive">ジョブ一覧の取得に失敗しました</p>
               )}
-              {jobsQuery.data && jobsQuery.data.length === 0 && (
+              {jobsQuery.data && jobsQuery.data.data.length === 0 && (
                 <p className="text-sm text-muted-foreground">まだジョブはありません</p>
               )}
               <div className="space-y-3">
-                {jobsQuery.data?.map((job) => (
+                {jobsQuery.data?.data.map((job) => (
                   <button
                     key={job.id}
                     type="button"
@@ -226,6 +227,13 @@ export function OnlineBatchDemoPage() {
                   </button>
                 ))}
               </div>
+              {jobsQuery.data && (
+                <div className="mt-4 flex items-center justify-between">
+                  <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>前へ</Button>
+                  <span>{page} ページ</span>
+                  <Button variant="outline" disabled={page >= jobsQuery.data.pagination.totalPages} onClick={() => setPage(page + 1)}>次へ</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 

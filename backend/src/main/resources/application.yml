@@ -27,6 +27,14 @@ mybatis:
     default-statement-timeout: 30
 
 app:
+  # 単一 API プロセス用。複数プロセス化する際は受付枠とセッション管理を共有化する。
+  batch:
+    max-active: 4
+    max-active-per-user: 2
+    starts-per-minute: 10
+    max-tracked-users: 10000
+    history-days: 7
+    max-history: 1000
   security:
     pepper: ${APP_PEPPER}
     # アプリの手前にある信頼できるリバースプロキシの段数。

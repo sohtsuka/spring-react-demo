@@ -65,8 +65,8 @@ services:
       # HTTP → HTTPS リダイレクトの行き先ポート。本番 (443 公開) では 443 にする
       HTTPS_PORT: "8443"
     ports:
-      - "8081:80"
-      - "8443:443"
+      - "127.0.0.1:8081:80"
+      - "127.0.0.1:8443:443"
     depends_on:
       backend:
         condition: service_healthy

@@ -11,6 +11,7 @@ spec:
       ports:
         - containerPort: 5432
           hostPort: 5432
+          hostIP: 127.0.0.1
       env:
         - name: POSTGRES_DB
           value: appdb

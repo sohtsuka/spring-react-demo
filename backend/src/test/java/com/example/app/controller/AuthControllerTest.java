@@ -2,6 +2,7 @@ package com.example.app.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +35,7 @@ import com.example.app.exception.GlobalExceptionHandler;
 import com.example.app.model.dto.LoginRequest;
 import com.example.app.model.entity.User;
 import com.example.app.model.enums.UserRole;
+import com.example.app.security.AuthSessionManager;
 import com.example.app.security.CustomUserDetails;
 import com.example.app.service.UserService;
 
@@ -45,6 +47,9 @@ class AuthControllerTest {
 
     @Mock
     UserService userService;
+
+    @Mock
+    AuthSessionManager sessions;
 
     @InjectMocks
     AuthController authController;
@@ -112,7 +117,7 @@ class AuthControllerTest {
     }
 
     @Test
-    void login_withExistingSession_invalidatesOldSession() throws Exception {
+    void login_withExistingSession_delegatesSessionPolicy() throws Exception {
         User user = buildUser();
         CustomUserDetails userDetails = new CustomUserDetails(user);
         Authentication auth = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
@@ -123,7 +128,7 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(new LoginRequest("admin", "Password1!"))))
                 .andExpect(status().isOk());
 
-        assertThat(existingSession.isInvalid()).isTrue();
+        then(sessions).should().login(eq(auth), any(), any());
     }
 
     @Test

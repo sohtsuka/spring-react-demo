@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -56,6 +57,34 @@ class SecurityConfigIntegrationTest {
     private static final AtomicInteger IDS = new AtomicInteger();
 
     MockMvc mockMvc;
+
+    @Autowired
+    org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @Test
+    void newLoginExpiresAnotherBrowsersSession() throws Exception {
+        User user = createAdmin();
+        // createAdmin inserts a placeholder verifier; use a real login-capable account here.
+        user.setUsername(user.getUsername() + "-login");
+        user.setEmail(user.getUsername() + "@example.com");
+        user.setPassword(passwordEncoder.encode("Password1!"));
+        users.insert(user);
+        String body = "{\"username\":\"" + user.getUsername() + "\",\"password\":\"Password1!\"}";
+        MockHttpSession first = (MockHttpSession) mockMvc
+                .perform(post("/api/v1/auth/login").contentType("application/json").content(body))
+                .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
+        var secondLogin = mockMvc.perform(post("/api/v1/auth/login").contentType("application/json").content(body))
+                .andExpect(status().isOk()).andReturn();
+        MockHttpSession second = (MockHttpSession) secondLogin.getRequest().getSession(false);
+        var csrf = java.util.Arrays.stream(secondLogin.getResponse().getCookies())
+                .filter(cookie -> cookie.getName().equals("XSRF-TOKEN")).reduce((previous, next) -> next).orElseThrow();
+        mockMvc.perform(post("/api/v1/online-batch-jobs").session(second).cookie(csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue()).contentType("application/json")
+                .content("{\"jobName\":\"login-control\",\"totalItems\":1,\"processingDelayMs\":0}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(get("/api/v1/auth/me").session(first)).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/auth/me").session(second)).andExpect(status().isOk());
+    }
 
     @BeforeEach
     void setUp() {

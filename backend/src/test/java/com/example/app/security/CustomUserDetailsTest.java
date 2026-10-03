@@ -11,6 +11,18 @@ import com.example.app.model.enums.UserRole;
 
 class CustomUserDetailsTest {
 
+    @Test
+    void identityUsesImmutableAccountIdAcrossSnapshots() {
+        User user = buildUser();
+        CustomUserDetails first = new CustomUserDetails(user);
+        CustomUserDetails second = new CustomUserDetails(buildUser());
+        user.setId(99L);
+        user.setUsername("renamed");
+        assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
+        assertThat(first.getAccountId()).isEqualTo(1L);
+        assertThat(first).isNotEqualTo(new CustomUserDetails(user)).isNotEqualTo("user").isNotEqualTo(null);
+    }
+
     private User buildUser() {
         User user = new User();
         user.setId(1L);

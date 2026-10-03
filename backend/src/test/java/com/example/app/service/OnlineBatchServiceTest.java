@@ -26,6 +26,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.transaction.support.TransactionOperations;
+
 import com.example.app.exception.AppException;
 import com.example.app.exception.ErrorCode;
 import com.example.app.model.dto.OnlineBatchJobResponse;
@@ -40,7 +42,8 @@ class OnlineBatchServiceTest {
     private final InMemoryOnlineBatchJobRepository onlineBatchJobRepository = new InMemoryOnlineBatchJobRepository();
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final OnlineBatchServiceImpl onlineBatchService = new OnlineBatchServiceImpl(onlineBatchJobRepository,
-            executor, new ObjectMapper());
+            executor, new ObjectMapper(), new BatchAdmission(100, 100, 1000, 1000),
+            TransactionOperations.withoutTransaction(), 7, 1000);
 
     @AfterEach
     void tearDown() {
@@ -49,7 +52,7 @@ class OnlineBatchServiceTest {
 
     @Test
     void start_completesJobAsynchronously() throws Exception {
-        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("売上集計", 3, null, 1));
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L, new StartOnlineBatchRequest("売上集計", 3, null, 1));
 
         OnlineBatchJobResponse completed = waitUntilFinished(accepted.id());
 
@@ -60,7 +63,7 @@ class OnlineBatchServiceTest {
 
     @Test
     void start_withFailureAtItem_marksJobFailed() throws Exception {
-        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("失敗デモ", 4, 2, 1));
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L, new StartOnlineBatchRequest("失敗デモ", 4, 2, 1));
 
         OnlineBatchJobResponse failed = waitUntilFinished(accepted.id());
 
@@ -88,7 +91,7 @@ class OnlineBatchServiceTest {
     @Test
     void processingExceptionMarksJobFailed() throws Exception {
         onlineBatchJobRepository.failNextUpdate.set(true);
-        Long id = onlineBatchService.start(new StartOnlineBatchRequest("exception", 1, null, 0)).id();
+        Long id = onlineBatchService.start(1L, new StartOnlineBatchRequest("exception", 1, null, 0)).id();
 
         OnlineBatchJobResponse failed = waitUntilFinished(id);
 
@@ -100,7 +103,7 @@ class OnlineBatchServiceTest {
     void failureRecordingExceptionLeavesJobForStartupRecovery() throws Exception {
         onlineBatchJobRepository.failNextUpdate.set(true);
         onlineBatchJobRepository.failNextRecovery.set(true);
-        Long id = onlineBatchService.start(new StartOnlineBatchRequest("recovery", 1, null, 0)).id();
+        Long id = onlineBatchService.start(1L, new StartOnlineBatchRequest("recovery", 1, null, 0)).id();
         for (int attempt = 0; attempt < 100 && onlineBatchJobRepository.failNextRecovery.get(); attempt++) {
             Thread.sleep(10);
         }
@@ -113,19 +116,21 @@ class OnlineBatchServiceTest {
 
     @Test
     void start_withFailureAtItemGreaterThanTotal_throwsValidationError() {
-        assertThrows(AppException.class, () -> onlineBatchService.start(new StartOnlineBatchRequest("不正", 3, 4, 0)));
+        assertThrows(AppException.class,
+                () -> onlineBatchService.start(1L, new StartOnlineBatchRequest("不正", 3, 4, 0)));
     }
 
     @Test
     void start_withNullDelay_usesDefaultDelay() {
-        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("標準遅延", 1, null, null));
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L,
+                new StartOnlineBatchRequest("標準遅延", 1, null, null));
 
         assertEquals(400, accepted.processingDelayMs());
     }
 
     @Test
     void start_withZeroDelay_completesWithoutSleeping() throws Exception {
-        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("即時実行", 2, null, 0));
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L, new StartOnlineBatchRequest("即時実行", 2, null, 0));
 
         OnlineBatchJobResponse completed = waitUntilFinished(accepted.id());
 
@@ -169,7 +174,7 @@ class OnlineBatchServiceTest {
         });
         Long newerId = onlineBatchJobRepository.seedJob(job -> job.setJobName("newer"));
 
-        List<OnlineBatchJobResponse> jobs = onlineBatchService.findAll();
+        List<OnlineBatchJobResponse> jobs = onlineBatchService.findAll(1, 20).data();
 
         assertThat(jobs).extracting(OnlineBatchJobResponse::id).containsSubsequence(newerId, olderId);
     }
@@ -193,13 +198,66 @@ class OnlineBatchServiceTest {
         ObjectMapper objectMapper = mock(ObjectMapper.class);
         given(objectMapper.writeValueAsString(any())).willThrow(new StubJsonProcessingException("write failed"));
         OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(repository,
-                Executors.newVirtualThreadPerTaskExecutor(), objectMapper);
+                Executors.newVirtualThreadPerTaskExecutor(), objectMapper, new BatchAdmission(100, 100, 1000, 1000),
+                TransactionOperations.withoutTransaction(), 7, 1000);
 
         try {
-            assertThatThrownBy(() -> service.start(new StartOnlineBatchRequest("broken", 1, null, 0)))
+            assertThatThrownBy(() -> service.start(1L, new StartOnlineBatchRequest("broken", 1, null, 0)))
                     .isInstanceOf(UncheckedIOException.class);
         } finally {
             service.shutdown();
+        }
+    }
+
+    @Test
+    void paginationRejectsInvalidRangesAndHandlesLargeOffsets() {
+        for (int[] range : new int[][]{{0, 20}, {1, 0}, {1, 101}}) {
+            assertThatThrownBy(() -> onlineBatchService.findAll(range[0], range[1])).isInstanceOf(AppException.class);
+        }
+        onlineBatchJobRepository.seedJob(job -> {
+        });
+        assertThat(onlineBatchService.findAll(1, 1).data()).hasSize(1);
+        assertThat(onlineBatchService.findAll(Integer.MAX_VALUE, 100).data()).isEmpty();
+    }
+
+    @Test
+    void historyFullAndInsertFailureReleaseReservedCapacity() {
+        BatchAdmission admission = new BatchAdmission(1, 1, 10, 10);
+        OnlineBatchJobRepository repository = mock(OnlineBatchJobRepository.class);
+        given(repository.count()).willReturn(1L, 0L);
+        org.mockito.Mockito.doThrow(new IllegalStateException("database unavailable")).when(repository).insert(any());
+        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(repository, executor, new ObjectMapper(), admission,
+                TransactionOperations.withoutTransaction(), 7, 1);
+        assertThatThrownBy(() -> service.start(1, new StartOnlineBatchRequest("full", 1, null, 0)))
+                .isInstanceOf(AppException.class).satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                        .isEqualTo(ErrorCode.BATCH_CAPACITY_EXCEEDED));
+        assertThatThrownBy(() -> service.start(1, new StartOnlineBatchRequest("insert", 1, null, 0)))
+                .isInstanceOf(IllegalStateException.class);
+        admission.acquire(1).close();
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.times(1)).insert(any());
+    }
+
+    @Test
+    void rejectedDispatchMarksFailedAndReleasesCapacity() {
+        ExecutorService rejected = mock(ExecutorService.class);
+        org.mockito.Mockito.doThrow(new java.util.concurrent.RejectedExecutionException()).when(rejected)
+                .execute(any());
+        BatchAdmission admission = new BatchAdmission(1, 1, 10, 10);
+        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(onlineBatchJobRepository, rejected,
+                new ObjectMapper(), admission, TransactionOperations.withoutTransaction(), 7, 1000);
+        assertThatThrownBy(() -> service.start(1, new StartOnlineBatchRequest("rejected", 1, null, 0)))
+                .isInstanceOf(AppException.class);
+        assertThat(service.findAll(1, 20).data()).extracting(OnlineBatchJobResponse::status)
+                .containsExactly(BatchJobStatus.FAILED);
+        admission.acquire(1).close();
+    }
+
+    @Test
+    void invalidHistoryConfigurationIsRejected() {
+        for (int[] limits : new int[][]{{0, 1}, {1, 0}}) {
+            assertThatThrownBy(() -> new OnlineBatchServiceImpl(onlineBatchJobRepository, executor, new ObjectMapper(),
+                    new BatchAdmission(1, 1, 1, 1), TransactionOperations.withoutTransaction(), limits[0], limits[1]))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 
@@ -242,9 +300,30 @@ class OnlineBatchServiceTest {
         }
 
         @Override
-        public List<OnlineBatchJob> findAll() {
+        public List<OnlineBatchJob> findAll(long offset, int limit) {
             return store.values().stream().map(this::copy)
-                    .sorted(Comparator.comparing(OnlineBatchJob::getCreatedAt).reversed()).toList();
+                    .sorted(Comparator.comparing(OnlineBatchJob::getCreatedAt).reversed()).skip(offset).limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public long count() {
+            return store.size();
+        }
+
+        @Override
+        public void pruneHistory(LocalDateTime cutoff, int maxRows) {
+            store.values().stream()
+                    .filter(job -> job.getStatus() == BatchJobStatus.COMPLETED
+                            || job.getStatus() == BatchJobStatus.FAILED)
+                    .filter(job -> job.getCompletedAt() != null && job.getCompletedAt().isBefore(cutoff))
+                    .map(OnlineBatchJob::getId).toList().forEach(store::remove);
+            store.values().stream()
+                    .filter(job -> job.getStatus() == BatchJobStatus.COMPLETED
+                            || job.getStatus() == BatchJobStatus.FAILED)
+                    .sorted(Comparator.comparing(OnlineBatchJob::getCreatedAt))
+                    .limit(Math.max(0, store.size() - maxRows)).map(OnlineBatchJob::getId).toList()
+                    .forEach(store::remove);
         }
 
         @Override

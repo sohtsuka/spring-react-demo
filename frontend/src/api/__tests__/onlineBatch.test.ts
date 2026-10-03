@@ -46,7 +46,8 @@ const mockStartedJob = {
 describe('onlineBatchApi', () => {
   it('getJobs: ジョブ一覧を返す', async () => {
     const result = await onlineBatchApi.getJobs()
-    expect(result).toEqual([mockListJob])
+    expect(result.data).toEqual([mockListJob])
+    expect(result.pagination.size).toBe(20)
   })
 
   it('getJob: 単一ジョブを返す', async () => {
