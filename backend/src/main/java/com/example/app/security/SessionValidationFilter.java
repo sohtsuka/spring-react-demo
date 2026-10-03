@@ -10,7 +10,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,7 +24,7 @@ import com.example.app.repository.UserRepository;
 /** 認可前に、セッションに保存された権限を現在のDBと照合する。 */
 public class SessionValidationFilter extends OncePerRequestFilter {
     private final UserRepository users;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builder().build();
 
     public SessionValidationFilter(UserRepository users) {
         this.users = users;

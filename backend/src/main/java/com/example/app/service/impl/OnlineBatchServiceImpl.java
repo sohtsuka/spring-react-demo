@@ -1,6 +1,5 @@
 package com.example.app.service.impl;
 
-import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,10 +10,10 @@ import java.util.concurrent.RejectedExecutionException;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -60,8 +59,8 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
     public OnlineBatchServiceImpl(OnlineBatchJobRepository onlineBatchJobRepository, BatchAdmission admission,
             PlatformTransactionManager transactionManager, @Value("${app.batch.history-days:7}") int historyDays,
             @Value("${app.batch.max-history:1000}") int maxHistory) {
-        this(onlineBatchJobRepository, Executors.newVirtualThreadPerTaskExecutor(), new ObjectMapper(), admission,
-                new TransactionTemplate(transactionManager), historyDays, maxHistory);
+        this(onlineBatchJobRepository, Executors.newVirtualThreadPerTaskExecutor(), JsonMapper.builder().build(),
+                admission, new TransactionTemplate(transactionManager), historyDays, maxHistory);
     }
 
     public OnlineBatchServiceImpl(OnlineBatchJobRepository onlineBatchJobRepository, ExecutorService executor,
@@ -268,23 +267,15 @@ public class OnlineBatchServiceImpl implements OnlineBatchService {
     }
 
     private List<String> parseEvents(String json) {
-        try {
-            if (json == null || json.isBlank()) {
-                return List.of();
-            }
-            return objectMapper.readValue(json,
-                    objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
-        } catch (JsonProcessingException ex) {
-            throw new UncheckedIOException(ex);
+        if (json == null || json.isBlank()) {
+            return List.of();
         }
+        return objectMapper.readValue(json,
+                objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
     }
 
     private String toJson(List<String> events) {
-        try {
-            return objectMapper.writeValueAsString(events);
-        } catch (JsonProcessingException ex) {
-            throw new UncheckedIOException(ex);
-        }
+        return objectMapper.writeValueAsString(events);
     }
 
     private OnlineBatchJobResponse toResponse(OnlineBatchJob job) {
