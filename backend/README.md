@@ -2,6 +2,8 @@
 
 Spring Boot + MyBatis + PostgreSQL による RESTful API サーバー。
 
+Rust 版との共通契約は、品質レビューでセッション・並行更新・バッチ復旧・入力検証・画面のエラー処理を修正している。レビューと検証の記録は `rust-react-demo/codex-review.md` にまとめている。
+
 ## 前提
 
 | ソフトウェア | バージョン |
@@ -81,6 +83,27 @@ curl -b cookies.txt -X POST http://localhost:8080/api/v1/logout \
 ---
 
 ## テスト・品質チェック
+
+Rust 版との HTTP 差分は、両版をそれぞれ新しい DB で起動してから Rust 側の `backend/` で実行する。
+
+差分用の Java サーバーは、このリポジトリの `backend/` から起動する:
+
+```bash
+TRUSTED_PROXY_COUNT=1 ./gradlew bootRun --args='--spring.profiles.active=dev'
+```
+
+Rustサーバーも独立した新しいDBと `TRUSTED_PROXY_COUNT=1` を指定して8081で起動する。通常の起動手順では信頼プロキシを有効にする必要はない。
+
+```bash
+COMPAT_JAVA_URL=http://localhost:8080 COMPAT_RUST_URL=http://localhost:8081 \
+  cargo test --locked --test compat -- --ignored --nocapture
+```
+
+明示実行時は両 URL が必須。差分シナリオではレート制限をX-Forwarded-Forで分離するため、両テストサーバーを `TRUSTED_PROXY_COUNT=1` で起動する（アプリの既定値は0）。
+
+**マージ順序**: Rust リポジトリの `.github/workflows/compat.yaml` は、このリポジトリのリビジョン (既定は `main`) を参照して比較する。したがって共通契約を変える修正は **このリポジトリを先にマージする**こと。逆順にすると Rust 側の比較ジョブが参照先に契約を見つけられず失敗する。先にマージできない場合は、Rust リポジトリのリポジトリ変数 `COMPAT_JAVA_REF` に対象ブランチ名を設定して参照先を切り替える。
+
+2026-09-29のローカル実サーバー比較は、新規の独立DBで150ステップ・差異0件。GitHub上での専用ワークフロー実行は未確認。
 
 ### 全品質チェックを一括実行 (CI と同等)
 
@@ -184,6 +207,13 @@ export NVD_API_KEY={NVD APIキー}
 | `DB_PASSWORD` | `apppassword` | DB パスワード |
 | `SESSION_TIMEOUT` | `1800` | セッションタイムアウト (秒) |
 
+## 運用時の契約
+
+- 認証済み要求では `SessionValidationFilter` が認可前に現在のユーザーを DB から照合する。削除・無効化・有効なロック、ロール・ユーザー名・パスワードの変更を検出すると既存セッションを破棄する。検出は次の要求時で、変更後に要求を送る前に元の状態へ戻した場合は対象外。DB 照合の失敗は 500 になる
+- ユーザー更新とログイン失敗の記録は対象行を `FOR UPDATE` でロックし、現在値の読み取りと更新を同じトランザクションで行う
+- バッチ処理の例外を FAILED として保存する。失敗記録も DB 障害で保存できなかった場合はログに残し、次回起動時に ACCEPTED / RUNNING を FAILED として回収する。完了時刻・回収イベントを保存し、進捗値と既存の終端状態を保持する。同じ DB を使う API は単一プロセスが前提
+- 一覧は `page >= 1`、`1 <= size <= 100`（既定 1 / 20）。offset は long で計算する。不正な値・型変換は 400、認証・認可を通過した未知のパスは 404、非対応 Content-Type は 415
+
 ---
 
 ## Spring Profile
@@ -207,3 +237,26 @@ export NVD_API_KEY={NVD APIキー}
 - Version Catalog は `gradle/libs.versions.toml` で管理しています。
 - BOM は Version Catalog 経由で選択できます（例: `libs.spring.boot.bom.v4003` / `libs.spring.boot.bom.v4002`、`libs.testcontainers.bom.v20` / `libs.testcontainers.bom.v19`）。
 - Renovate はリポジトリルートの `renovate.json` で管理し、Gradle 関連更新には `minimumReleaseAge: 7 days` を適用しています。
+
+## バッチ・セッションの保護設定
+
+オンラインバッチは単一 API プロセスで実行する。`app.batch` の既定値は全体同時4件、
+利用者ごと同時2件・60秒間10件。利用者の識別には認証済みアカウントの固定IDを使う。
+利用者の上限超過は429、全体の空き枠不足や停止中は503を返す。再試行は利用者が時間を空けて行う。
+保存・実行投入に失敗した要求も、取得済みの60秒間の受付枠は消費する。
+受付履歴の利用者状態は最大10,000件で、実行中でなく60秒間の記録もない状態を破棄する。
+
+ジョブ履歴は全体1,000件を上限とし、完了・失敗したジョブだけを古い順に削除する。
+終了から7日経過した履歴も削除する（毎分および新規受付時）。実行中のジョブは削除しない。
+一覧APIは `page`（1以上、既定1）と `size`（1〜100、既定20）を受け取り、
+`data` と `pagination` を返す。削除済みジョブの詳細取得は404になる。
+各上限は `application.yml` の `app.batch` で設定でき、正数が必須。
+
+再ログインすると、同じアカウントの以前のセッションは次のアクセスで401になる。
+新しいログインのセッションはローテーションされ、更新操作に使うCSRF cookieも再発行する。
+受付制限・セッション管理・起動時の未完了ジョブ回収は単一プロセスを前提とするため、
+APIを複数プロセスへ拡張する前に共有ストアと排他的なジョブ所有権を導入すること。
+
+`compose.yaml` のDB、`compose.prod.yaml` の検査用HTTP/HTTPS、`pod.yaml` のDB公開先は
+`127.0.0.1` に限定する。既存コンテナには再作成後に反映される。
+検査用の既知パスワード・pepper・自己署名証明書は本番の秘密情報に置き換えること。

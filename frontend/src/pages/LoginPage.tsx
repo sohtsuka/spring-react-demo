@@ -41,14 +41,19 @@ export function LoginPage() {
     } catch (error) {
       if (error instanceof HttpError) {
         const status = error.status
-        if (status === 401) {
-          setError('root', {
-            message: 'ユーザー名またはパスワードが正しくありません',
-          })
-        } else if (status === 423) {
+        if (status === 401 && error.code === 'ACCOUNT_LOCKED') {
           setError('root', {
             message:
               'アカウントがロックされています。しばらく経ってから再試行してください',
+          })
+        } else if (
+          (status === 401 && error.code === 'ACCOUNT_DISABLED') ||
+          (status === 429 && error.code === 'RATE_LIMIT_EXCEEDED')
+        ) {
+          setError('root', { message: error.message })
+        } else if (status === 401) {
+          setError('root', {
+            message: 'ユーザー名またはパスワードが正しくありません',
           })
         } else {
           setError('root', { message: 'ログインに失敗しました' })

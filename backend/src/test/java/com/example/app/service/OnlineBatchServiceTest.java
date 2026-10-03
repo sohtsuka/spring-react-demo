@@ -18,12 +18,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+
+import org.springframework.transaction.support.TransactionOperations;
 
 import com.example.app.exception.AppException;
 import com.example.app.exception.ErrorCode;
@@ -39,7 +42,8 @@ class OnlineBatchServiceTest {
     private final InMemoryOnlineBatchJobRepository onlineBatchJobRepository = new InMemoryOnlineBatchJobRepository();
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final OnlineBatchServiceImpl onlineBatchService = new OnlineBatchServiceImpl(onlineBatchJobRepository,
-            executor, new ObjectMapper());
+            executor, new ObjectMapper(), new BatchAdmission(100, 100, 1000, 1000),
+            TransactionOperations.withoutTransaction(), 7, 1000);
 
     @AfterEach
     void tearDown() {
@@ -48,7 +52,7 @@ class OnlineBatchServiceTest {
 
     @Test
     void start_completesJobAsynchronously() throws Exception {
-        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("売上集計", 3, null, 1));
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L, new StartOnlineBatchRequest("売上集計", 3, null, 1));
 
         OnlineBatchJobResponse completed = waitUntilFinished(accepted.id());
 
@@ -59,7 +63,7 @@ class OnlineBatchServiceTest {
 
     @Test
     void start_withFailureAtItem_marksJobFailed() throws Exception {
-        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("失敗デモ", 4, 2, 1));
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L, new StartOnlineBatchRequest("失敗デモ", 4, 2, 1));
 
         OnlineBatchJobResponse failed = waitUntilFinished(accepted.id());
 
@@ -70,20 +74,63 @@ class OnlineBatchServiceTest {
     }
 
     @Test
+    void recoverInterruptedMarksOnlyUnfinishedJobsFailed() {
+        Long accepted = onlineBatchJobRepository.seedJob(job -> {
+        });
+        Long running = onlineBatchJobRepository.seedJob(job -> job.setStatus(BatchJobStatus.RUNNING));
+        Long completed = onlineBatchJobRepository.seedJob(job -> job.setStatus(BatchJobStatus.COMPLETED));
+
+        onlineBatchService.recoverInterrupted();
+
+        assertThat(onlineBatchService.findById(accepted).status()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(onlineBatchService.findById(running).status()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(onlineBatchService.findById(completed).status()).isEqualTo(BatchJobStatus.COMPLETED);
+        assertThat(onlineBatchService.findById(running).completedAt()).isNotNull();
+    }
+
+    @Test
+    void processingExceptionMarksJobFailed() throws Exception {
+        onlineBatchJobRepository.failNextUpdate.set(true);
+        Long id = onlineBatchService.start(1L, new StartOnlineBatchRequest("exception", 1, null, 0)).id();
+
+        OnlineBatchJobResponse failed = waitUntilFinished(id);
+
+        assertThat(failed.status()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(failed.completedAt()).isNotNull();
+    }
+
+    @Test
+    void failureRecordingExceptionLeavesJobForStartupRecovery() throws Exception {
+        onlineBatchJobRepository.failNextUpdate.set(true);
+        onlineBatchJobRepository.failNextRecovery.set(true);
+        Long id = onlineBatchService.start(1L, new StartOnlineBatchRequest("recovery", 1, null, 0)).id();
+        for (int attempt = 0; attempt < 100 && onlineBatchJobRepository.failNextRecovery.get(); attempt++) {
+            Thread.sleep(10);
+        }
+
+        assertThat(onlineBatchJobRepository.failNextRecovery).isFalse();
+        assertThat(onlineBatchService.findById(id).status()).isEqualTo(BatchJobStatus.ACCEPTED);
+        onlineBatchService.recoverInterrupted();
+        assertThat(onlineBatchService.findById(id).status()).isEqualTo(BatchJobStatus.FAILED);
+    }
+
+    @Test
     void start_withFailureAtItemGreaterThanTotal_throwsValidationError() {
-        assertThrows(AppException.class, () -> onlineBatchService.start(new StartOnlineBatchRequest("不正", 3, 4, 0)));
+        assertThrows(AppException.class,
+                () -> onlineBatchService.start(1L, new StartOnlineBatchRequest("不正", 3, 4, 0)));
     }
 
     @Test
     void start_withNullDelay_usesDefaultDelay() {
-        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("標準遅延", 1, null, null));
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L,
+                new StartOnlineBatchRequest("標準遅延", 1, null, null));
 
         assertEquals(400, accepted.processingDelayMs());
     }
 
     @Test
     void start_withZeroDelay_completesWithoutSleeping() throws Exception {
-        OnlineBatchJobResponse accepted = onlineBatchService.start(new StartOnlineBatchRequest("即時実行", 2, null, 0));
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L, new StartOnlineBatchRequest("即時実行", 2, null, 0));
 
         OnlineBatchJobResponse completed = waitUntilFinished(accepted.id());
 
@@ -127,7 +174,7 @@ class OnlineBatchServiceTest {
         });
         Long newerId = onlineBatchJobRepository.seedJob(job -> job.setJobName("newer"));
 
-        List<OnlineBatchJobResponse> jobs = onlineBatchService.findAll();
+        List<OnlineBatchJobResponse> jobs = onlineBatchService.findAll(1, 20).data();
 
         assertThat(jobs).extracting(OnlineBatchJobResponse::id).containsSubsequence(newerId, olderId);
     }
@@ -151,13 +198,66 @@ class OnlineBatchServiceTest {
         ObjectMapper objectMapper = mock(ObjectMapper.class);
         given(objectMapper.writeValueAsString(any())).willThrow(new StubJsonProcessingException("write failed"));
         OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(repository,
-                Executors.newVirtualThreadPerTaskExecutor(), objectMapper);
+                Executors.newVirtualThreadPerTaskExecutor(), objectMapper, new BatchAdmission(100, 100, 1000, 1000),
+                TransactionOperations.withoutTransaction(), 7, 1000);
 
         try {
-            assertThatThrownBy(() -> service.start(new StartOnlineBatchRequest("broken", 1, null, 0)))
+            assertThatThrownBy(() -> service.start(1L, new StartOnlineBatchRequest("broken", 1, null, 0)))
                     .isInstanceOf(UncheckedIOException.class);
         } finally {
             service.shutdown();
+        }
+    }
+
+    @Test
+    void paginationRejectsInvalidRangesAndHandlesLargeOffsets() {
+        for (int[] range : new int[][]{{0, 20}, {1, 0}, {1, 101}}) {
+            assertThatThrownBy(() -> onlineBatchService.findAll(range[0], range[1])).isInstanceOf(AppException.class);
+        }
+        onlineBatchJobRepository.seedJob(job -> {
+        });
+        assertThat(onlineBatchService.findAll(1, 1).data()).hasSize(1);
+        assertThat(onlineBatchService.findAll(Integer.MAX_VALUE, 100).data()).isEmpty();
+    }
+
+    @Test
+    void historyFullAndInsertFailureReleaseReservedCapacity() {
+        BatchAdmission admission = new BatchAdmission(1, 1, 10, 10);
+        OnlineBatchJobRepository repository = mock(OnlineBatchJobRepository.class);
+        given(repository.count()).willReturn(1L, 0L);
+        org.mockito.Mockito.doThrow(new IllegalStateException("database unavailable")).when(repository).insert(any());
+        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(repository, executor, new ObjectMapper(), admission,
+                TransactionOperations.withoutTransaction(), 7, 1);
+        assertThatThrownBy(() -> service.start(1, new StartOnlineBatchRequest("full", 1, null, 0)))
+                .isInstanceOf(AppException.class).satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                        .isEqualTo(ErrorCode.BATCH_CAPACITY_EXCEEDED));
+        assertThatThrownBy(() -> service.start(1, new StartOnlineBatchRequest("insert", 1, null, 0)))
+                .isInstanceOf(IllegalStateException.class);
+        admission.acquire(1).close();
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.times(1)).insert(any());
+    }
+
+    @Test
+    void rejectedDispatchMarksFailedAndReleasesCapacity() {
+        ExecutorService rejected = mock(ExecutorService.class);
+        org.mockito.Mockito.doThrow(new java.util.concurrent.RejectedExecutionException()).when(rejected)
+                .execute(any());
+        BatchAdmission admission = new BatchAdmission(1, 1, 10, 10);
+        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(onlineBatchJobRepository, rejected,
+                new ObjectMapper(), admission, TransactionOperations.withoutTransaction(), 7, 1000);
+        assertThatThrownBy(() -> service.start(1, new StartOnlineBatchRequest("rejected", 1, null, 0)))
+                .isInstanceOf(AppException.class);
+        assertThat(service.findAll(1, 20).data()).extracting(OnlineBatchJobResponse::status)
+                .containsExactly(BatchJobStatus.FAILED);
+        admission.acquire(1).close();
+    }
+
+    @Test
+    void invalidHistoryConfigurationIsRejected() {
+        for (int[] limits : new int[][]{{0, 1}, {1, 0}}) {
+            assertThatThrownBy(() -> new OnlineBatchServiceImpl(onlineBatchJobRepository, executor, new ObjectMapper(),
+                    new BatchAdmission(1, 1, 1, 1), TransactionOperations.withoutTransaction(), limits[0], limits[1]))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 
@@ -175,6 +275,23 @@ class OnlineBatchServiceTest {
     private static final class InMemoryOnlineBatchJobRepository implements OnlineBatchJobRepository {
         private final ConcurrentMap<Long, OnlineBatchJob> store = new ConcurrentHashMap<>();
         private final AtomicLong sequence = new AtomicLong(0);
+        private final AtomicBoolean failNextUpdate = new AtomicBoolean();
+        private final AtomicBoolean failNextRecovery = new AtomicBoolean();
+
+        @Override
+        public void failIncomplete(Long id, String events) {
+            if (failNextRecovery.compareAndSet(true, false)) {
+                throw new IllegalStateException("simulated recovery failure");
+            }
+            store.values().stream().filter(job -> id == null || id.equals(job.getId())).filter(
+                    job -> job.getStatus() == BatchJobStatus.ACCEPTED || job.getStatus() == BatchJobStatus.RUNNING)
+                    .forEach(job -> {
+                        job.setStatus(BatchJobStatus.FAILED);
+                        job.setCompletedAt(LocalDateTime.now());
+                        job.setRecentEvents(events);
+                        job.setCurrentItem(null);
+                    });
+        }
 
         @Override
         public Optional<OnlineBatchJob> findById(Long id) {
@@ -183,9 +300,30 @@ class OnlineBatchServiceTest {
         }
 
         @Override
-        public List<OnlineBatchJob> findAll() {
+        public List<OnlineBatchJob> findAll(long offset, int limit) {
             return store.values().stream().map(this::copy)
-                    .sorted(Comparator.comparing(OnlineBatchJob::getCreatedAt).reversed()).toList();
+                    .sorted(Comparator.comparing(OnlineBatchJob::getCreatedAt).reversed()).skip(offset).limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public long count() {
+            return store.size();
+        }
+
+        @Override
+        public void pruneHistory(LocalDateTime cutoff, int maxRows) {
+            store.values().stream()
+                    .filter(job -> job.getStatus() == BatchJobStatus.COMPLETED
+                            || job.getStatus() == BatchJobStatus.FAILED)
+                    .filter(job -> job.getCompletedAt() != null && job.getCompletedAt().isBefore(cutoff))
+                    .map(OnlineBatchJob::getId).toList().forEach(store::remove);
+            store.values().stream()
+                    .filter(job -> job.getStatus() == BatchJobStatus.COMPLETED
+                            || job.getStatus() == BatchJobStatus.FAILED)
+                    .sorted(Comparator.comparing(OnlineBatchJob::getCreatedAt))
+                    .limit(Math.max(0, store.size() - maxRows)).map(OnlineBatchJob::getId).toList()
+                    .forEach(store::remove);
         }
 
         @Override
@@ -203,6 +341,9 @@ class OnlineBatchServiceTest {
 
         @Override
         public void update(OnlineBatchJob job) {
+            if (failNextUpdate.compareAndSet(true, false)) {
+                throw new IllegalStateException("simulated update failure");
+            }
             OnlineBatchJob copy = copy(job);
             copy.setUpdatedAt(LocalDateTime.now());
             store.put(copy.getId(), copy);

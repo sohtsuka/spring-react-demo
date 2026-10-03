@@ -3,6 +3,7 @@ package com.example.app.security;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -13,9 +14,25 @@ import com.example.app.model.entity.User;
 public class CustomUserDetails implements UserDetails {
 
     private final User user;
+    private final long accountId;
 
     public CustomUserDetails(User user) {
         this.user = user;
+        this.accountId = Objects.requireNonNull(user.getId(), "Account ID is required");
+    }
+
+    public long getAccountId() {
+        return accountId;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof CustomUserDetails details && accountId == details.accountId;
+    }
+
+    @Override
+    public int hashCode() {
+        return Long.hashCode(accountId);
     }
 
     public User getUser() {

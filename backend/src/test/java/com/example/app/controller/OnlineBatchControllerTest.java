@@ -1,6 +1,7 @@
 package com.example.app.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +21,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -26,8 +31,11 @@ import com.example.app.exception.AppException;
 import com.example.app.exception.ErrorCode;
 import com.example.app.exception.GlobalExceptionHandler;
 import com.example.app.model.dto.OnlineBatchJobResponse;
+import com.example.app.model.dto.PagedResponse;
 import com.example.app.model.dto.StartOnlineBatchRequest;
+import com.example.app.model.entity.User;
 import com.example.app.model.enums.BatchJobStatus;
+import com.example.app.security.CustomUserDetails;
 import com.example.app.service.OnlineBatchService;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,14 +52,26 @@ class OnlineBatchControllerTest {
 
     @BeforeEach
     void setUp() {
+        User user = new User();
+        user.setId(1L);
+        CustomUserDetails principal = new CustomUserDetails(user);
+        SecurityContextHolder.getContext()
+                .setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of()));
         objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders.standaloneSetup(onlineBatchController)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
+    }
+
+    @AfterEach
+    void clearContext() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
     void list_returns200() throws Exception {
-        given(onlineBatchService.findAll()).willReturn(List.of(buildResponse(BatchJobStatus.RUNNING)));
+        given(onlineBatchService.findAll(1, 20))
+                .willReturn(PagedResponse.of(List.of(buildResponse(BatchJobStatus.RUNNING)), 1, 20, 1));
 
         mockMvc.perform(get("/api/v1/online-batch-jobs")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].jobName").value("CSV取込デモ"))
@@ -77,7 +97,7 @@ class OnlineBatchControllerTest {
     @Test
     void start_withValidRequest_returns201() throws Exception {
         StartOnlineBatchRequest request = new StartOnlineBatchRequest("CSV取込デモ", 6, null, 0);
-        given(onlineBatchService.start(any())).willReturn(buildResponse(BatchJobStatus.ACCEPTED));
+        given(onlineBatchService.start(eq(1L), any())).willReturn(buildResponse(BatchJobStatus.ACCEPTED));
 
         mockMvc.perform(post("/api/v1/online-batch-jobs").contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))).andExpect(status().isCreated())

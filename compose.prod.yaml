@@ -1,0 +1,75 @@
+# 本番構成の動作確認用スタック。
+#
+#   nginx (TLS 終端, SPA を dist で配信, /api を backend へプロキシ)
+#     → backend (本番プロファイル: Secure Cookie, HSTS, APP_PEPPER 必須)
+#       → postgres
+#
+# 本番プロファイルをそのまま動かすため、Secure Cookie が成立するよう nginx で HTTPS を終端する
+# (検査用の自己署名証明書をイメージ内で生成している。本番では正規の証明書に差し替える)。
+#
+#   起動: podman-compose -f compose.prod.yaml up -d --build
+#   確認: https://localhost:8443/  (自己署名なので警告が出る)
+#   停止: podman-compose -f compose.prod.yaml down -v
+#
+# 【検査用の上書き】本番と異なる点は次の 2 つだけ。
+#   - SPRING_FLYWAY_LOCATIONS に db/testdata を足し、ログイン可能な初期ユーザーを作る
+#     (admin / manager / user1、パスワードはすべて Password1!)
+#   - APP_PEPPER に testdata のハッシュと対応する dev の pepper を置いている
+# 本番ではどちらも必ず変更すること。
+
+name: prod-check
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18.3
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+    # 本番同様、DB はホストに公開しない
+    volumes:
+      - prod_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/appdb
+      DB_USERNAME: appuser
+      DB_PASSWORD: apppassword
+      # 本番で必須。【検査用】testdata のハッシュは dev の pepper で作られているため、
+      # ログインを成立させるには同じ値を使う必要がある。本番では必ず別の値にする
+      APP_PEPPER: dev-pepper-change-in-production
+      # nginx が 1 段だけ前にいるので、X-Forwarded-For は右から 1 番目を信用する
+      TRUSTED_PROXY_COUNT: "1"
+      # 【検査用】ログイン可能な初期ユーザーを作るため testdata を適用する
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/testdata
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  nginx:
+    build:
+      context: ./frontend
+    environment:
+      # HTTP → HTTPS リダイレクトの行き先ポート。本番 (443 公開) では 443 にする
+      HTTPS_PORT: "8443"
+    ports:
+      - "127.0.0.1:8081:80"
+      - "127.0.0.1:8443:443"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  prod_postgres_data:

@@ -1,6 +1,7 @@
 package com.example.app.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -22,9 +23,11 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.example.app.model.dto.ErrorResponse;
 import com.example.app.service.UserService;
@@ -57,6 +60,11 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/test/body")
         String expectBody(@RequestBody GlobalExceptionHandlerTest.TestBody body) {
             return body.value();
+        }
+
+        @GetMapping("/test/id/{id}")
+        long expectId(@PathVariable("id") long id) {
+            return id;
         }
     }
 
@@ -122,5 +130,27 @@ class GlobalExceptionHandlerTest {
     void handleMethodNotSupported_returns405() throws Exception {
         mockMvc.perform(patch("/test/body")).andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+    }
+
+    @Test
+    void handleTypeMismatch_returns400() throws Exception {
+        mockMvc.perform(get("/test/id/abc")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void handleUnsupportedMediaType_returns415() throws Exception {
+        mockMvc.perform(post("/test/body").contentType(MediaType.TEXT_PLAIN).content("plain"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    @Test
+    void handleNotFound_returns404() {
+        ResponseEntity<ErrorResponse> response = handler.handleNotFound(mock(NoResourceFoundException.class));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().code()).isEqualTo("NOT_FOUND");
     }
 }

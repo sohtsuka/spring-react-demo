@@ -97,8 +97,8 @@ describe('LoginPage', () => {
     })
   })
 
-  it('フォーム送信: 423 → アカウントロックメッセージを表示する', async () => {
-    const loginAsync = vi.fn().mockRejectedValue(new HttpError(423, 'Locked'))
+  it('フォーム送信: 401 + ACCOUNT_LOCKED → アカウントロックメッセージを表示する', async () => {
+    const loginAsync = vi.fn().mockRejectedValue(new HttpError(401, 'Locked', 'ACCOUNT_LOCKED'))
     mockUseAuth.mockReturnValue(makeAuth({ loginAsync }))
     renderLoginPage()
     await userEvent.type(screen.getByLabelText('ユーザー名'), 'user')
@@ -107,6 +107,29 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/アカウントがロックされています/)).toBeInTheDocument()
     })
+  })
+
+  it.each([
+    [401, 'ACCOUNT_DISABLED', 'アカウントが無効化されています'],
+    [429, 'RATE_LIMIT_EXCEEDED', 'リクエストが多すぎます'],
+  ])('フォーム送信: %i + %s → API メッセージを表示する', async (status, code, message) => {
+    const loginAsync = vi.fn().mockRejectedValue(new HttpError(status, message, code))
+    mockUseAuth.mockReturnValue(makeAuth({ loginAsync }))
+    renderLoginPage()
+    await userEvent.type(screen.getByLabelText('ユーザー名'), 'user')
+    await userEvent.type(screen.getByLabelText('パスワード'), 'Password123')
+    await userEvent.click(screen.getByRole('button', { name: 'ログイン' }))
+    expect(await screen.findByText(message)).toBeInTheDocument()
+  })
+
+  it('フォーム送信: 401 + 他の code → 認証失敗メッセージを表示する', async () => {
+    const loginAsync = vi.fn().mockRejectedValue(new HttpError(401, 'API 詳細', 'INVALID_CREDENTIALS'))
+    mockUseAuth.mockReturnValue(makeAuth({ loginAsync }))
+    renderLoginPage()
+    await userEvent.type(screen.getByLabelText('ユーザー名'), 'user')
+    await userEvent.type(screen.getByLabelText('パスワード'), 'Password123')
+    await userEvent.click(screen.getByRole('button', { name: 'ログイン' }))
+    expect(await screen.findByText('ユーザー名またはパスワードが正しくありません')).toBeInTheDocument()
   })
 
   it('フォーム送信: その他エラー → 汎用エラーメッセージを表示する', async () => {

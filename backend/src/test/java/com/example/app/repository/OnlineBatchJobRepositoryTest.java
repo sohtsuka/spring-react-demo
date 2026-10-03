@@ -74,10 +74,66 @@ class OnlineBatchJobRepositoryTest {
         second.setJobName("後続ジョブ");
         onlineBatchJobRepository.insert(second);
 
-        List<OnlineBatchJob> jobs = onlineBatchJobRepository.findAll();
+        List<OnlineBatchJob> jobs = onlineBatchJobRepository.findAll(0, 100);
         assertThat(jobs).isNotEmpty();
         assertThat(jobs.get(0).getJobName()).isEqualTo("後続ジョブ");
     }
+
+    @Test
+    void failIncompleteOnlyChangesAcceptedAndRunningJobs() {
+        OnlineBatchJob accepted = buildJob();
+        onlineBatchJobRepository.insert(accepted);
+        OnlineBatchJob running = buildJob();
+        running.setStatus(BatchJobStatus.RUNNING);
+        onlineBatchJobRepository.insert(running);
+        OnlineBatchJob completed = buildJob();
+        completed.setStatus(BatchJobStatus.COMPLETED);
+        onlineBatchJobRepository.insert(completed);
+
+        onlineBatchJobRepository.failIncomplete(null, "[\"recovered\"]");
+
+        OnlineBatchJob recovered = onlineBatchJobRepository.findById(accepted.getId()).orElseThrow();
+        assertThat(recovered.getStatus()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(recovered.getCompletedAt()).isNotNull();
+        assertThat(recovered.getRecentEvents()).isEqualTo("[\"recovered\"]");
+        assertThat(onlineBatchJobRepository.findById(running.getId()).orElseThrow().getStatus())
+                .isEqualTo(BatchJobStatus.FAILED);
+        assertThat(onlineBatchJobRepository.findById(completed.getId()).orElseThrow().getStatus())
+                .isEqualTo(BatchJobStatus.COMPLETED);
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional
+    void retentionBoundsHistoryWithoutDeletingActiveJobs() {
+        org.springframework.jdbc.core.JdbcTemplate jdbc = new org.springframework.jdbc.core.JdbcTemplate(dataSource);
+        jdbc.update("DELETE FROM online_batch_jobs");
+        OnlineBatchJob active = buildJob();
+        onlineBatchJobRepository.insert(active);
+        OnlineBatchJob expired = buildJob();
+        expired.setStatus(BatchJobStatus.COMPLETED);
+        onlineBatchJobRepository.insert(expired);
+        expired.setCompletedAt(java.time.LocalDateTime.now().minusDays(8));
+        onlineBatchJobRepository.update(expired);
+        OnlineBatchJob recent = buildJob();
+        recent.setStatus(BatchJobStatus.FAILED);
+        onlineBatchJobRepository.insert(recent);
+        recent.setCompletedAt(java.time.LocalDateTime.now());
+        onlineBatchJobRepository.update(recent);
+        onlineBatchJobRepository.pruneHistory(java.time.LocalDateTime.now().minusDays(7), 1000);
+        assertThat(onlineBatchJobRepository.findById(expired.getId())).isEmpty();
+        assertThat(onlineBatchJobRepository.count()).isEqualTo(2);
+        assertThat(onlineBatchJobRepository.findAll(0, 1)).extracting(OnlineBatchJob::getId)
+                .containsExactly(recent.getId());
+        assertThat(onlineBatchJobRepository.findAll(1, 1)).extracting(OnlineBatchJob::getId)
+                .containsExactly(active.getId());
+        onlineBatchJobRepository.pruneHistory(java.time.LocalDateTime.now().minusDays(7), 1);
+        assertThat(onlineBatchJobRepository.findById(active.getId())).isPresent();
+        assertThat(onlineBatchJobRepository.findById(recent.getId())).isEmpty();
+        assertThat(onlineBatchJobRepository.count()).isEqualTo(1);
+    }
+
+    @Autowired
+    javax.sql.DataSource dataSource;
 
     private OnlineBatchJob buildJob() {
         OnlineBatchJob job = new OnlineBatchJob();

@@ -13,6 +13,12 @@ spring:
   session:
     timeout: ${SESSION_TIMEOUT:1800}s
 
+  jackson:
+    datatype:
+      enum:
+        # enum を序数 (0, 1, ...) で受け付けない。名前 (ADMIN 等) のみ許可する
+        fail-on-numbers-for-enums: true
+
 mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
@@ -21,8 +27,20 @@ mybatis:
     default-statement-timeout: 30
 
 app:
+  # 単一 API プロセス用。複数プロセス化する際は受付枠とセッション管理を共有化する。
+  batch:
+    max-active: 4
+    max-active-per-user: 2
+    starts-per-minute: 10
+    max-tracked-users: 10000
+    history-days: 7
+    max-history: 1000
   security:
     pepper: ${APP_PEPPER}
+    # アプリの手前にある信頼できるリバースプロキシの段数。
+    # 0 = プロキシ無し (X-Forwarded-For を信用しない)。N 段のときは XFF の右から N 番目を
+    # クライアント IP として使うため、攻撃者が前方に足した値では レート制限を迂回できない。
+    trusted-proxy-count: ${TRUSTED_PROXY_COUNT:0}
 
 server:
   port: 8080

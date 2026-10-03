@@ -88,6 +88,33 @@ describe('レスポンス処理', () => {
     expect(error).toBeInstanceOf(HttpError)
     expect((error as HttpError).status).toBe(404)
   })
+
+  it('API の code・message・details を HttpError に保持する', async () => {
+    const details = [{ field: 'username', message: '入力してください' }]
+    server.use(
+      http.post('/api/v1/auth/login', () =>
+        HttpResponse.json({ code: 'ACCOUNT_LOCKED', message: 'ロック中', details }, { status: 401 }),
+      ),
+    )
+    const error = await api.post('/auth/login', {}).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(HttpError)
+    expect(error).toMatchObject({
+      status: 401,
+      code: 'ACCOUNT_LOCKED',
+      message: 'ロック中',
+      details,
+    })
+  })
+
+  it('不正なエラー本文でも安全な既定値を使う', async () => {
+    server.use(
+      http.get('/api/v1/auth/me', () =>
+        HttpResponse.json({ code: 42, message: null, details: [{ field: 1 }, null] }, { status: 400 }),
+      ),
+    )
+    const error = await api.get('/auth/me').catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 400, code: undefined, details: [] })
+  })
 })
 
 describe('CSRF インターセプター: 非安全メソッド', () => {

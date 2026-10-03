@@ -12,13 +12,17 @@ import com.example.app.model.entity.User;
 @Mapper
 public interface UserRepository {
 
+    Long lockById(@Param("id") Long id);
+
+    Long lockByUsername(@Param("username") String username);
+
     Optional<User> findById(@Param("id") Long id);
 
     Optional<User> findByUsername(@Param("username") String username);
 
     Optional<User> findByEmail(@Param("email") String email);
 
-    List<User> findAll(@Param("offset") int offset, @Param("limit") int limit);
+    List<User> findAll(@Param("offset") long offset, @Param("limit") int limit);
 
     long count();
 

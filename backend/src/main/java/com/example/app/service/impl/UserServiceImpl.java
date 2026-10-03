@@ -35,7 +35,10 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public PagedResponse<UserResponse> findAll(int page, int size) {
-        int offset = (page - 1) * size;
+        if (page < 1 || size < 1 || size > 100) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+        long offset = ((long) page - 1) * size;
         List<UserResponse> users = userRepository.findAll(offset, size).stream().map(UserResponse::from).toList();
         long total = userRepository.count();
         return PagedResponse.of(users, page, size, total);
@@ -73,6 +76,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse update(Long id, UpdateUserRequest request) {
+        userRepository.lockById(id);
         User user = userRepository.findById(id).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (request.username() != null && !request.username().equals(user.getUsername())) {
@@ -110,6 +114,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void recordLoginFailure(String username) {
+        userRepository.lockByUsername(username);
         userRepository.findByUsername(username).ifPresent(user -> {
             int newAttempts = user.getFailedLoginAttempts() + 1;
             userRepository.incrementFailedLoginAttempts(username);

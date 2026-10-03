@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { HttpError } from '@/lib/api'
 import { onlineBatchApi } from '@/api/onlineBatch'
 import * as toastHook from '@/hooks/useToast'
 import { OnlineBatchDemoPage } from '../OnlineBatchDemoPage'
@@ -15,7 +16,7 @@ describe('OnlineBatchDemoPage', () => {
 
   it('ジョブがない場合は空状態を表示する', async () => {
     server.use(
-      http.get('/api/v1/online-batch-jobs', () => HttpResponse.json({ data: [] })),
+      http.get('/api/v1/online-batch-jobs', () => HttpResponse.json({ data: [], pagination: { page: 1, size: 20, totalElements: [].length, totalPages: 1 } })),
     )
 
     renderWithProviders(<OnlineBatchDemoPage />)
@@ -80,7 +81,7 @@ describe('OnlineBatchDemoPage', () => {
     }
 
     server.use(
-      http.get('/api/v1/online-batch-jobs', () => HttpResponse.json({ data: [firstJob, secondJob] })),
+      http.get('/api/v1/online-batch-jobs', () => HttpResponse.json({ data: [firstJob, secondJob], pagination: { page: 1, size: 20, totalElements: [firstJob, secondJob].length, totalPages: 1 } })),
       http.get('/api/v1/online-batch-jobs/1', () => HttpResponse.json({ data: firstJob })),
       http.get('/api/v1/online-batch-jobs/2', () => HttpResponse.json({ data: secondJob })),
     )
@@ -116,7 +117,7 @@ describe('OnlineBatchDemoPage', () => {
     }
 
     server.use(
-      http.get('/api/v1/online-batch-jobs', () => HttpResponse.json({ data: [completedJob] })),
+      http.get('/api/v1/online-batch-jobs', () => HttpResponse.json({ data: [completedJob], pagination: { page: 1, size: 20, totalElements: [completedJob].length, totalPages: 1 } })),
       http.get('/api/v1/online-batch-jobs/9', () => HttpResponse.json({ data: completedJob })),
     )
 
@@ -132,7 +133,7 @@ describe('OnlineBatchDemoPage', () => {
     server.use(
       http.get('/api/v1/online-batch-jobs', () => {
         requestCount += 1
-        return HttpResponse.json({ data: [] })
+        return HttpResponse.json({ data: [], pagination: { page: 1, size: 20, totalElements: [].length, totalPages: 1 } })
       }),
     )
 
@@ -167,7 +168,7 @@ describe('OnlineBatchDemoPage', () => {
     }
 
     server.use(
-      http.get('/api/v1/online-batch-jobs', () => HttpResponse.json({ data: [] })),
+      http.get('/api/v1/online-batch-jobs', () => HttpResponse.json({ data: [], pagination: { page: 1, size: 20, totalElements: [].length, totalPages: 1 } })),
       http.get('/api/v1/online-batch-jobs/5', () =>
         HttpResponse.json({ data: startedJob }),
       ),
@@ -248,4 +249,38 @@ describe('OnlineBatchDemoPage', () => {
 
     expect(await screen.findByText('ジョブ詳細の取得に失敗しました')).toBeInTheDocument()
   })
+  it.each([429, 503, 500])('受付拒否 %s の場合は自動再実行せず案内する', async (status) => {
+    const toast = vi.fn()
+    vi.spyOn(toastHook, 'useToast').mockReturnValue({ toast, dismiss: vi.fn(), toasts: [] })
+    const start = vi.spyOn(onlineBatchApi, 'startJob').mockRejectedValue(new HttpError(status, 'unavailable'))
+    renderWithProviders(<OnlineBatchDemoPage />)
+    fireEvent.submit((await screen.findByRole('button', { name: 'バッチを起動' })).closest('form')!)
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      description: status === 500 ? 'オンラインバッチの起動に失敗しました' : '現在はジョブを受け付けられません。しばらく待ってから再実行してください',
+    })))
+    expect(start).toHaveBeenCalledTimes(1)
+  })
+
+  it('ページを前後に移動し、選択した詳細を維持する', async () => {
+    const original = await onlineBatchApi.getJobs()
+    const pages: string[] = []
+    server.use(http.get('/api/v1/online-batch-jobs', ({ request }) => {
+      const page = new URL(request.url).searchParams.get('page')!
+      pages.push(page)
+      return HttpResponse.json({ data: page === '1' ? original.data : [], pagination: { page: Number(page), size: 20, totalElements: 21, totalPages: 2 } })
+    }))
+    const user = userEvent.setup()
+    renderWithProviders(<OnlineBatchDemoPage />)
+    await user.click(await screen.findByRole('button', { name: /売上CSV取込デモ/ }))
+    await screen.findByText('37%')
+    expect(screen.getByRole('button', { name: '前へ' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '次へ' }))
+    await screen.findByText('まだジョブはありません')
+    expect(screen.getByText('37%')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '次へ' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '前へ' }))
+    await screen.findByRole('button', { name: /売上CSV取込デモ/ })
+    expect(pages).toEqual(expect.arrayContaining(['1', '2']))
+  })
+
 })
