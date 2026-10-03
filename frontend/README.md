@@ -7,7 +7,7 @@ APIのエラー本文は `HttpError` の `code` / `message` / `details` に保�
 ## 前提条件
 
 - Node.js 24.x (LTS)
-- pnpm 10.x
+- pnpm 12.7.0 (`package.json` で固定)
 - バックエンド (`http://localhost:8080`) が起動していること (API 通信時)
 
 ## セットアップ
@@ -15,6 +15,11 @@ APIのエラー本文は `HttpError` の `code` / `message` / `details` に保�
 ```bash
 pnpm install
 ```
+
+依存更新は Renovate と同じく公開から 7 日以上経過した GA 版を対象とします。
+`pnpm-workspace.yaml` の `minimumReleaseAge` でもこの制約を適用しています。
+TypeScript は typescript-eslint の対応範囲 (`<6.1.0`) に合わせて 6.0.3 を使用し、
+`@types/node` は実行環境と同じ 24 系を使用します。
 
 ## 開発サーバー起動
 

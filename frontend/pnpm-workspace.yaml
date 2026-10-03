@@ -1,8 +1,8 @@
 minimumReleaseAge: 10080
 
-onlyBuiltDependencies:
-  - esbuild
-  - msw
+allowBuilds:
+  esbuild: true
+  msw: true
 
 trustPolicy: no-downgrade
 

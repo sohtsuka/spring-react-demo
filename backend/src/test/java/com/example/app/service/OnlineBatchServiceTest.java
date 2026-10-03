@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
-import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -21,10 +20,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -42,7 +42,7 @@ class OnlineBatchServiceTest {
     private final InMemoryOnlineBatchJobRepository onlineBatchJobRepository = new InMemoryOnlineBatchJobRepository();
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final OnlineBatchServiceImpl onlineBatchService = new OnlineBatchServiceImpl(onlineBatchJobRepository,
-            executor, new ObjectMapper(), new BatchAdmission(100, 100, 1000, 1000),
+            executor, JsonMapper.builder().build(), new BatchAdmission(100, 100, 1000, 1000),
             TransactionOperations.withoutTransaction(), 7, 1000);
 
     @AfterEach
@@ -186,24 +186,24 @@ class OnlineBatchServiceTest {
     }
 
     @Test
-    void findById_withInvalidRecentEvents_throwsUncheckedIOException() {
+    void findById_withInvalidRecentEvents_throwsJacksonException() {
         Long jobId = onlineBatchJobRepository.seedJob(job -> job.setRecentEvents("not-json"));
 
-        assertThatThrownBy(() -> onlineBatchService.findById(jobId)).isInstanceOf(UncheckedIOException.class);
+        assertThatThrownBy(() -> onlineBatchService.findById(jobId)).isInstanceOf(JacksonException.class);
     }
 
     @Test
-    void start_whenSerializingEventsFails_throwsUncheckedIOException() throws Exception {
+    void start_whenSerializingEventsFails_throwsJacksonException() throws Exception {
         OnlineBatchJobRepository repository = mock(OnlineBatchJobRepository.class);
         ObjectMapper objectMapper = mock(ObjectMapper.class);
-        given(objectMapper.writeValueAsString(any())).willThrow(new StubJsonProcessingException("write failed"));
+        given(objectMapper.writeValueAsString(any())).willThrow(new StubJacksonException("write failed"));
         OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(repository,
                 Executors.newVirtualThreadPerTaskExecutor(), objectMapper, new BatchAdmission(100, 100, 1000, 1000),
                 TransactionOperations.withoutTransaction(), 7, 1000);
 
         try {
             assertThatThrownBy(() -> service.start(1L, new StartOnlineBatchRequest("broken", 1, null, 0)))
-                    .isInstanceOf(UncheckedIOException.class);
+                    .isInstanceOf(JacksonException.class);
         } finally {
             service.shutdown();
         }
@@ -226,8 +226,8 @@ class OnlineBatchServiceTest {
         OnlineBatchJobRepository repository = mock(OnlineBatchJobRepository.class);
         given(repository.count()).willReturn(1L, 0L);
         org.mockito.Mockito.doThrow(new IllegalStateException("database unavailable")).when(repository).insert(any());
-        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(repository, executor, new ObjectMapper(), admission,
-                TransactionOperations.withoutTransaction(), 7, 1);
+        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(repository, executor, JsonMapper.builder().build(),
+                admission, TransactionOperations.withoutTransaction(), 7, 1);
         assertThatThrownBy(() -> service.start(1, new StartOnlineBatchRequest("full", 1, null, 0)))
                 .isInstanceOf(AppException.class).satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                         .isEqualTo(ErrorCode.BATCH_CAPACITY_EXCEEDED));
@@ -244,7 +244,7 @@ class OnlineBatchServiceTest {
                 .execute(any());
         BatchAdmission admission = new BatchAdmission(1, 1, 10, 10);
         OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(onlineBatchJobRepository, rejected,
-                new ObjectMapper(), admission, TransactionOperations.withoutTransaction(), 7, 1000);
+                JsonMapper.builder().build(), admission, TransactionOperations.withoutTransaction(), 7, 1000);
         assertThatThrownBy(() -> service.start(1, new StartOnlineBatchRequest("rejected", 1, null, 0)))
                 .isInstanceOf(AppException.class);
         assertThat(service.findAll(1, 20).data()).extracting(OnlineBatchJobResponse::status)
@@ -255,8 +255,9 @@ class OnlineBatchServiceTest {
     @Test
     void invalidHistoryConfigurationIsRejected() {
         for (int[] limits : new int[][]{{0, 1}, {1, 0}}) {
-            assertThatThrownBy(() -> new OnlineBatchServiceImpl(onlineBatchJobRepository, executor, new ObjectMapper(),
-                    new BatchAdmission(1, 1, 1, 1), TransactionOperations.withoutTransaction(), limits[0], limits[1]))
+            assertThatThrownBy(() -> new OnlineBatchServiceImpl(onlineBatchJobRepository, executor,
+                    JsonMapper.builder().build(), new BatchAdmission(1, 1, 1, 1),
+                    TransactionOperations.withoutTransaction(), limits[0], limits[1]))
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }
@@ -389,8 +390,8 @@ class OnlineBatchServiceTest {
         }
     }
 
-    private static final class StubJsonProcessingException extends JsonProcessingException {
-        StubJsonProcessingException(String message) {
+    private static final class StubJacksonException extends JacksonException {
+        StubJacksonException(String message) {
             super(message);
         }
     }

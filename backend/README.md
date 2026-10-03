@@ -235,8 +235,10 @@ export NVD_API_KEY={NVD APIキー}
 ```
 
 - Version Catalog は `gradle/libs.versions.toml` で管理しています。
-- BOM は Version Catalog 経由で選択できます（例: `libs.spring.boot.bom.v4003` / `libs.spring.boot.bom.v4002`、`libs.testcontainers.bom.v20` / `libs.testcontainers.bom.v19`）。
+- BOM は Version Catalog の `libs.spring.boot.bom` / `libs.testcontainers.bom` で指定し、対応するバージョンは `[versions]` で管理しています。
 - Renovate はリポジトリルートの `renovate.json` で管理し、Gradle 関連更新には `minimumReleaseAge: 7 days` を適用しています。
+- 2026-10-03 に公開から 7 日以上経過した GA 版へ更新しました。Spring Boot は 4.1.1、MyBatis Starter は 4.1.0 です。Spring Boot の BOM が管理する依存は BOM に合わせます。
+- JSON 処理は Jackson 3 (`tools.jackson`) を使用します。JSON 処理失敗は非検査例外の `JacksonException` として伝播します。
 
 ## バッチ・セッションの保護設定
 
