@@ -10,7 +10,7 @@ jacoco = "0.8.15"
 spotless = "8.10.3"
 checkstyle = "14.1.0"
 spotbugs = "4.10.4"
-spotbugsPlugin = "6.5.11"
+spotbugsPlugin = "6.5.12"
 archunit = "1.5.1"
 
 [libraries]
