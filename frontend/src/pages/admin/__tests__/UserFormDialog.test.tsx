@@ -106,6 +106,11 @@ describe('UserFormDialog: 作成モード', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '作成中...' })).toBeDisabled()
     })
+    // Finish the request before another test can observe its global toast.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '作成' })).toBeEnabled()
+      expect(screen.getByText('ユーザーを作成しました')).toBeInTheDocument()
+    })
   })
 })
 
@@ -179,6 +184,10 @@ describe('UserFormDialog: 編集モード', () => {
     await userEvent.click(screen.getByRole('button', { name: '更新' }))
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '更新中...' })).toBeDisabled()
+    })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '更新' })).toBeEnabled()
+      expect(screen.getByText('ユーザーを更新しました')).toBeInTheDocument()
     })
   })
 })
