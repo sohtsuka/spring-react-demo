@@ -1,7 +1,7 @@
 # 本番構成の API イメージ。
 # ビルド → 実行を分け、実行イメージには JRE と jar だけを置く。
 
-FROM docker.io/library/eclipse-temurin:25-jdk AS build
+FROM docker.io/library/eclipse-temurin:27-jdk AS build
 WORKDIR /build
 
 # 依存の解決結果をレイヤーキャッシュに残すため、まずビルド定義だけを入れる
@@ -16,7 +16,7 @@ COPY src src
 RUN ./gradlew --no-daemon --console=plain bootJar -x test \
     && cp build/libs/*.jar /build/app.jar
 
-FROM docker.io/library/eclipse-temurin:25-jre
+FROM docker.io/library/eclipse-temurin:27-jre
 WORKDIR /app
 
 # root では動かさない
