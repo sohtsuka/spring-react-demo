@@ -17,8 +17,10 @@
             nodejs-slim_24
             (pnpm_12.override {
               version = "12.8.2";
-              srcHash = lib.fakeHash;
-              cargoHash = lib.fakeHash;
+              # Draft only: hashes require generation in a Nix-capable environment.
+              # Do not replace these guards with guessed hashes.
+              srcHash = throw "Draft: verified pnpm 12.8.2 source hash is required";
+              cargoHash = throw "Draft: verified pnpm 12.8.2 Cargo dependency hash is required";
             })
             postgresql_18
             (devcontainer.override { nodejs = nodejs-slim_24; })
