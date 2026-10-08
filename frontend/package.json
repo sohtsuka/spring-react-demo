@@ -4,14 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "devEngines": {
-    "node": "24.x",
-    "packageManager": {
-      "name": "pnpm",
-      "version": "12.7.0",
-      "onFail": "download"
-    }
+    "node": "24.x"
   },
-  "packageManager": "pnpm@12.7.0",
+  "packageManager": "pnpm@12.8.2",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -36,7 +31,7 @@
     "@tanstack/react-query": "5.104.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "lucide-react": "1.48.0",
+    "lucide-react": "1.49.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-hook-form": "7.89.0",
@@ -55,17 +50,17 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
-    "@vitest/coverage-v8": "5.0.2",
-    "@vitest/ui": "5.0.2",
+    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/ui": "5.0.3",
     "eslint": "10.11.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "jsdom": "30.1.1",
-    "msw": "2.15.0",
+    "msw": "3.0.1",
     "postcss": "8.5.28",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.70.1",
+    "typescript-eslint": "8.71.0",
     "vite": "8.3.1",
-    "vitest": "5.0.2"
+    "vitest": "5.0.3"
   }
 }
