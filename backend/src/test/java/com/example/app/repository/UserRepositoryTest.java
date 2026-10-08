@@ -30,7 +30,7 @@ import com.example.app.service.UserService;
 class UserRepositoryTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18.6");
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
