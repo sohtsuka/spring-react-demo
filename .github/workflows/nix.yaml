@@ -1,0 +1,34 @@
+name: Nix development shell
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['flake.nix', 'flake.lock', '.github/workflows/nix.yaml']
+  push:
+    branches: [chore/nixos-26-05-npm-free]
+
+permissions:
+  contents: read
+
+jobs:
+  nix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+      - name: Generate lock and verify pnpm hashes (bootstrap only)
+        run: |
+          nix flake update nixpkgs
+          echo 'FLAKE_LOCK_BEGIN'
+          cat flake.lock
+          echo 'FLAKE_LOCK_END'
+          nix store prefetch-file --unpack --json https://github.com/pnpm/pnpm/archive/refs/tags/v12.8.2.tar.gz > /tmp/pnpm-source.json
+          cat /tmp/pnpm-source.json
+          python3 - <<'PY'
+          import json
+          p = 'flake.nix'
+          s = open(p).read().replace('srcHash = lib.fakeHash;', 'srcHash = "' + json.load(open('/tmp/pnpm-source.json'))['hash'] + '";')
+          open(p, 'w').write(s)
+          PY
+          nix develop --command true

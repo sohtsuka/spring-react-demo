@@ -1,7 +1,7 @@
 {
   description = "Spring+React Codebase";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
   outputs = { nixpkgs, ... }:
     let
@@ -14,10 +14,14 @@
             # git
             gradle_9
             jdk25
-            (nodejs_24.override { enableNpm = false; })
-            (pnpm_10.override { withNode = false; })
+            nodejs-slim_24
+            (pnpm_12.override {
+              version = "12.8.2";
+              srcHash = lib.fakeHash;
+              cargoHash = lib.fakeHash;
+            })
             postgresql_18
-            devcontainer
+            (devcontainer.override { nodejs = nodejs-slim_24; })
           ];
 
           shellHook = ''
