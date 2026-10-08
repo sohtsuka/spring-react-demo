@@ -22,7 +22,7 @@ import com.example.app.model.enums.BatchJobStatus;
 class OnlineBatchJobRepositoryTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18.6");
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {

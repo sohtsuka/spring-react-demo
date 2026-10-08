@@ -39,7 +39,7 @@ import com.example.app.security.CustomUserDetails;
 class SecurityConfigIntegrationTest {
 
     @Container
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18.6");
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
