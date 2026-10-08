@@ -16,6 +16,14 @@ This repository contains a Spring Boot API in `backend/` and a Vite React SPA in
 - `cd frontend && pnpm lint && pnpm test`: run frontend linting and unit/component tests.
 - `cd frontend && pnpm e2e`: run Playwright tests after backend and frontend are running.
 
+## Language Runtime LTS Policy (Mandatory)
+
+- For languages/runtimes with official LTS releases, use only currently supported LTS release lines. Never switch to a non-LTS, Current, early-access, or preview release merely because its version number is higher.
+- Preserve the current supported LTS major unless the user explicitly requests a runtime-major change; any proposed replacement must also be an officially supported LTS release. The current baselines are Java/Temurin 25 and Node.js 24.
+- Before proposing an update, independently confirm the target's LTS designation and support status in the vendor's official release/support documentation: [Eclipse Temurin](https://adoptium.net/support) and [Node.js](https://nodejs.org/en/about/previous-releases). Record the evidence in the PR; do not infer LTS status from version numbering or a dependency bot proposal.
+- Apply this rule consistently to local development, build toolchains, CI, and container build/runtime images. Keep Renovate runtime constraints aligned with the approved LTS baseline; changing those constraints requires the same explicit request and official LTS check.
+- Do not invent an LTS requirement for Rust, TypeScript, or other languages/tools that do not offer an official LTS release line. Follow their supported stable-release policy instead.
+
 ## Coding Style & Naming Conventions
 
 Backend targets Java 25 and uses Spotless with the Eclipse formatter, Checkstyle, and SpotBugs. Keep packages under `com.example.app`; use clear layer names such as `controller`, `service`, `repository`, and `model.dto`. Test classes should end in `Test`.
