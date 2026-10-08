@@ -1,9 +1,15 @@
 name: Renovate
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   schedule:
     - cron: "10 15 * * *"
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
 
 jobs:
   renovate:

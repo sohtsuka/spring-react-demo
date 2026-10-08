@@ -12,10 +12,41 @@
     },
     {
       "matchManagers": [
-        "npm",
-        "pnpm"
+        "npm"
       ],
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchFileNames": [
+        "frontend/package.json"
+      ],
+      "matchDepTypes": [
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "frontend non-major dependencies",
+      "groupSlug": "frontend-non-major"
+    },
+    {
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchPackageNames": [
+        "postgres",
+        "docker.io/library/postgres"
+      ],
+      "groupName": "PostgreSQL container images",
+      "groupSlug": "postgres-images"
     }
-  ]
+  ],
+  "rebaseWhen": "behind-base-branch",
+  "prConcurrentLimit": 5
 }
