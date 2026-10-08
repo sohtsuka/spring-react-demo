@@ -45,6 +45,18 @@
       ],
       "groupName": "PostgreSQL container images",
       "groupSlug": "postgres-images"
+    },
+    {
+      "description": "Keep Temurin on approved Java 25 LTS; change only after an explicit LTS-major upgrade request and official support check.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "eclipse-temurin",
+        "library/eclipse-temurin",
+        "docker.io/library/eclipse-temurin"
+      ],
+      "allowedVersions": "/^25([.-]|$)/"
     }
   ],
   "rebaseWhen": "behind-base-branch",
