@@ -6,7 +6,7 @@
   "devEngines": {
     "node": "24.x"
   },
-  "packageManager": "pnpm@12.8.2",
+  "packageManager": "pnpm@12.11.2",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
