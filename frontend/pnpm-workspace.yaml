@@ -7,3 +7,6 @@ allowBuilds:
 trustPolicy: no-downgrade
 
 trustPolicyIgnoreAfter: 43200
+minimumReleaseAgeExclude:
+  # Renovate security update: zod@4.6.6
+  - zod@4.6.6
