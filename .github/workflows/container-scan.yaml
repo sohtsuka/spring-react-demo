@@ -1,0 +1,99 @@
+name: Container scan
+
+# 本番構成のコンテナイメージ (compose.prod.yaml) に含まれる OS パッケージなどの
+# 既知の脆弱性を OSV-Scanner で検査する。lockfile の検査は security-scan.yaml が担当する。
+# ベースイメージ (nginx, Temurin, postgres) 側の脆弱性は後から公開されることが多いため、
+# 週次で最新のベースイメージから作り直して検査する。
+# 結果は SARIF として GitHub の Code scanning (カテゴリ container-<イメージ名>) に登録する。
+# サードパーティの Action は使わず、公式リリースのバイナリをハッシュ検証して実行する。
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/Dockerfile'
+      - 'frontend/Dockerfile'
+      - 'compose.prod.yaml'
+      - '.github/workflows/container-scan.yaml'
+  push:
+    branches: [main]
+  schedule:
+    # 毎週月曜 19:10 UTC (火曜 04:10 JST)
+    - cron: '10 19 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  OSV_SCANNER_VERSION: v2.7.1
+  OSV_SCANNER_SHA256: fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
+
+jobs:
+  image-scan:
+    name: Image scan (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: backend
+          - name: frontend
+            context: frontend
+          - name: postgres
+            # compose.prod.yaml と同じイメージ
+            image: docker.io/library/postgres:18.6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install OSV-Scanner
+        run: |
+          curl -fsSL -o /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  /tmp/osv-scanner" | sha256sum --check --strict
+          chmod +x /tmp/osv-scanner
+
+      # ベースイメージは毎回取り直し、公開済みの修正が反映された状態で検査する
+      - name: Build image
+        if: matrix.context
+        env:
+          CONTEXT: ${{ matrix.context }}
+          NAME: ${{ matrix.name }}
+        run: docker build --pull --tag "scan/${NAME}:latest" "${CONTEXT}"
+
+      - name: Pull image
+        if: matrix.image
+        env:
+          IMAGE: ${{ matrix.image }}
+          NAME: ${{ matrix.name }}
+        run: |
+          docker pull "${IMAGE}"
+          docker tag "${IMAGE}" "scan/${NAME}:latest"
+
+      # 脆弱性が見つかると終了コード 1 を返すが、判定は Code scanning 側で行う。
+      # それ以外の終了コード (スキャン自体の失敗) と、SARIF が出力されない場合はジョブを失敗させる。
+      - name: Scan image
+        env:
+          NAME: ${{ matrix.name }}
+        run: |
+          set +e
+          /tmp/osv-scanner scan image --format sarif --output image.sarif "scan/${NAME}:latest"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 1 ]; then
+            echo "::error::OSV-Scanner failed with exit code ${status}"
+            exit "$status"
+          fi
+          test -s image.sarif
+
+      - name: Upload SARIF to Code scanning
+        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
+        with:
+          sarif_file: image.sarif
+          category: container-${{ matrix.name }}

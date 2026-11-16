@@ -534,6 +534,7 @@ Spring Security の `headers()` 設定で以下のヘッダーを全レスポン
 ### 8.6 依存ライブラリの脆弱性管理
 
 - バックエンド・フロントエンド: OSV-Scanner で `gradle.lockfile` と `pnpm-lock.yaml` を CI で検査する（PR では新たに入る脆弱性で失敗、main と週次で全件を Code scanning に登録）
+- コンテナイメージ: `Container scan` ワークフローで本番構成のイメージ (backend, frontend, postgres) を週次で作り直し、OS パッケージを含めて OSV-Scanner で検査する
 - Renovate が脆弱性修正を含む更新 PR を優先して作成する
 
 ---

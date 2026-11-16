@@ -190,6 +190,8 @@ COMPAT_JAVA_URL=http://localhost:8080 COMPAT_RUST_URL=http://localhost:8081 \
 osv-scanner scan source -r .
 ```
 
+実行イメージ（Temurin の JRE と OS パッケージ）は `Container scan` ワークフローが週次で検査する（Code scanning のカテゴリ `container-backend`）。手元では `docker build -t app-backend .` の後に `osv-scanner scan image app-backend` で確認できる。
+
 ---
 
 ## 環境変数
