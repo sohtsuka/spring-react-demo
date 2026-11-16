@@ -13,7 +13,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
-FROM docker.io/library/nginx:alpine
+FROM docker.io/library/nginx:1.31.8-alpine
 # 検査用の自己署名証明書。本番では正規の証明書をマウントして置き換える。
 RUN apk add --no-cache openssl \
     && mkdir -p /etc/nginx/tls \

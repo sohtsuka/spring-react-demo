@@ -60,5 +60,14 @@
     }
   ],
   "rebaseWhen": "behind-base-branch",
-  "prConcurrentLimit": 5
+  "prConcurrentLimit": 10,
+  "vulnerabilityAlerts": {
+    "description": "Security fixes are not held back by the normal PR limits or release-age wait.",
+    "labels": [
+      "security"
+    ],
+    "prConcurrentLimit": 0,
+    "prHourlyLimit": 0,
+    "minimumReleaseAge": null
+  }
 }
