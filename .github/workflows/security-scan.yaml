@@ -2,9 +2,11 @@ name: Security scan
 
 # 依存ライブラリの既知の脆弱性を OSV-Scanner で検査する。
 # 対象は lockfile (backend/gradle.lockfile, frontend/pnpm-lock.yaml など) で、間接依存も含む。
-# - PR: ベースブランチと比べて新たに入る脆弱性があれば失敗する
-# - main への push と週次: 全件を GitHub の Code scanning (ツール名 osv-scanner) に登録する
-#   (既存の脆弱性で main を赤くしないよう、ここでは失敗させない)
+# 結果は SARIF として GitHub の Code scanning (カテゴリ osv-scanner) に登録する。
+# - PR: Code scanning のチェックが、PR で新たに入った脆弱性だけを報告する
+#   (リポジトリ設定の Check runs failure threshold により High 以上で失敗)
+# - main への push と週次: 全件を登録し、新しく公開された脆弱性も拾う
+# サードパーティの Action は使わず、公式リリースのバイナリをハッシュ検証して実行する。
 
 on:
   pull_request:
@@ -12,29 +14,52 @@ on:
   push:
     branches: [main]
   schedule:
-    # 毎週月曜 18:40 UTC (火曜 03:40 JST)。新しく公開された脆弱性を拾う
+    # 毎週月曜 18:40 UTC (火曜 03:40 JST)
     - cron: '40 18 * * 1'
   workflow_dispatch:
 
 permissions: {}
 
-jobs:
-  osv-pr:
-    name: OSV-Scanner (new vulnerabilities)
-    if: github.event_name == 'pull_request'
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+env:
+  OSV_SCANNER_VERSION: v2.7.1
+  OSV_SCANNER_SHA256: fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8
 
-  osv-full:
-    name: OSV-Scanner (full report)
-    if: github.event_name != 'pull_request'
+jobs:
+  osv-scanner:
+    name: OSV-Scanner
+    runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
       security-events: write
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
-    with:
-      fail-on-vuln: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install OSV-Scanner
+        run: |
+          curl -fsSL -o /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  /tmp/osv-scanner" | sha256sum --check --strict
+          chmod +x /tmp/osv-scanner
+
+      # 脆弱性が見つかると終了コード 1 を返すが、判定は Code scanning 側で行う。
+      # それ以外の終了コード (スキャン自体の失敗) と、SARIF が出力されない場合はジョブを失敗させる。
+      - name: Scan lockfiles
+        run: |
+          set +e
+          /tmp/osv-scanner scan source --recursive --format sarif --output osv-scanner.sarif .
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] && [ "$status" -ne 1 ]; then
+            echo "::error::OSV-Scanner failed with exit code ${status}"
+            exit "$status"
+          fi
+          test -s osv-scanner.sarif
+
+      - name: Upload SARIF to Code scanning
+        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4.35.2
+        with:
+          sarif_file: osv-scanner.sarif
+          category: osv-scanner
