@@ -83,7 +83,7 @@ jobs:
           NAME: ${{ matrix.name }}
         run: |
           set +e
-          /tmp/osv-scanner scan image --format sarif --output image.sarif "scan/${NAME}:latest"
+          /tmp/osv-scanner scan image --format sarif --output-file image.sarif "scan/${NAME}:latest"
           status=$?
           set -e
           if [ "$status" -ne 0 ] && [ "$status" -ne 1 ]; then
