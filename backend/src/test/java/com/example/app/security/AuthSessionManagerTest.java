@@ -40,6 +40,10 @@ class AuthSessionManagerTest {
     void rotatesExistingSessionAndCsrfWithoutMigratingAttributes() {
         var request = new MockHttpServletRequest();
         var old = request.getSession();
+        // ブラウザーが既存セッションの cookie を送ってきた状態を再現する。
+        // spring-test 7.0.10 以降の MockHttpServletRequest は、要求されたセッション ID が
+        // 無いと isRequestedSessionIdValid() を false とし、セッション固定化対策が働かない。
+        request.setRequestedSessionId(old.getId());
         old.setAttribute("untrusted", "value");
         var response = new MockHttpServletResponse();
         login(1, request, response);
