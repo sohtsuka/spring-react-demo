@@ -10,3 +10,5 @@ trustPolicyIgnoreAfter: 43200
 minimumReleaseAgeExclude:
   # Renovate security update: zod@4.6.6
   - zod@4.6.6
+  # Renovate security update: vite@8.3.3
+  - vite@8.3.3
