@@ -1,7 +1,6 @@
 [versions]
 springBoot = "4.1.2"
 dependencyManagement = "1.1.7"
-dependencycheck = "13.0.0"
 mybatisSpringBoot = "4.1.0"
 bucket4j = "8.20.0"
 bouncyCastle = "1.86"
@@ -31,6 +30,5 @@ testcontainers = ["testcontainers-junit-jupiter", "testcontainers-postgresql"]
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 dependency-management = { id = "io.spring.dependency-management", version.ref = "dependencyManagement" }
-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "dependencycheck" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 spotbugs-plugin = { id = "com.github.spotbugs", version.ref = "spotbugsPlugin" }

@@ -40,4 +40,4 @@ Recent history uses concise imperative subjects, often with Conventional Commit 
 
 ## Security & Configuration Tips
 
-Do not commit secrets. Backend dev defaults are in `backend/README.md`; production values must override database credentials, session settings, and password pepper. Set `NVD_API_KEY` before `./gradlew dependencyCheckAnalyze`.
+Do not commit secrets. Backend dev defaults are in `backend/README.md`; production values must override database credentials, session settings, and password pepper. Dependency vulnerabilities are scanned by the `Security scan` workflow (OSV-Scanner over the lockfiles); run `osv-scanner scan source -r .` to check locally.

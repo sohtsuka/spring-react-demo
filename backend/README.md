@@ -182,17 +182,13 @@ COMPAT_JAVA_URL=http://localhost:8080 COMPAT_RUST_URL=http://localhost:8081 \
 
 ### 脆弱性スキャン
 
-事前に [NVD](https://nvd.nist.gov/developers/request-an-api-key) でAPIキーを申請し、発行された値を環境変数にセットする。
+依存ライブラリの既知の脆弱性は、CI の `Security scan` ワークフロー（OSV-Scanner）が `gradle.lockfile` を対象に検査する。結果は GitHub の Security タブ（Code scanning、ツール名 `osv-scanner`）に表示される。
+
+手元で確認する場合は [OSV-Scanner](https://google.github.io/osv-scanner/) をインストールして、リポジトリのルートで実行する。
 
 ```bash
-export NVD_API_KEY={NVD APIキー}
+osv-scanner scan source -r .
 ```
-
-```bash
-./gradlew dependencyCheckAnalyze
-```
-
-レポートは `build/reports/dependency-check-report.html`。
 
 ---
 

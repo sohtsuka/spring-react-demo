@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.dependency.management)
     id 'jacoco'
-    alias(libs.plugins.dependencycheck)
     id 'checkstyle'
     alias(libs.plugins.spotless)
     alias(libs.plugins.spotbugs.plugin)
@@ -129,13 +128,6 @@ spotbugsTest {
         xml.required = false
         html.required = true
         sarif.required = true
-    }
-}
-
-// ---------------------------------------------------------------------------
-dependencyCheck {
-    nvd {
-        apiKey = System.getenv('NVD_API_KEY')
     }
 }
 
