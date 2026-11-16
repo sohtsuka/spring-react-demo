@@ -7,14 +7,12 @@ name: Container scan
 # 結果は SARIF として GitHub の Code scanning (カテゴリ container-<イメージ名>) に登録する。
 # サードパーティの Action は使わず、公式リリースのバイナリをハッシュ検証して実行する。
 
+# PR でも毎回実行する。Code scanning は lockfile 検査と同じ osv-scanner ツールとして
+# 結果をまとめるため、PR でこのワークフローが動かないと、main にある container-* の結果と
+# 比較できず osv-scanner のチェックが neutral (判定不能) になる。
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'backend/Dockerfile'
-      - 'frontend/Dockerfile'
-      - 'compose.prod.yaml'
-      - '.github/workflows/container-scan.yaml'
   push:
     branches: [main]
   schedule:
