@@ -533,8 +533,8 @@ Spring Security の `headers()` 設定で以下のヘッダーを全レスポン
 
 ### 8.6 依存ライブラリの脆弱性管理
 
-- バックエンド: OWASP Dependency-Check Gradle プラグインを CI で実行
-- フロントエンド: `pnpm audit` を CI で実行
+- バックエンド・フロントエンド: OSV-Scanner で `gradle.lockfile` と `pnpm-lock.yaml` を CI で検査する（PR では新たに入る脆弱性で失敗、main と週次で全件を Code scanning に登録）
+- Renovate が脆弱性修正を含む更新 PR を優先して作成する
 
 ---
 
@@ -843,7 +843,6 @@ plugins {
     id 'org.springframework.boot' version '4.0.3'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'jacoco'
-    id 'org.owasp.dependencycheck' version '12.2.0'
 }
 
 java {

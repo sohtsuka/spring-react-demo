@@ -1,0 +1,40 @@
+name: Security scan
+
+# 依存ライブラリの既知の脆弱性を OSV-Scanner で検査する。
+# 対象は lockfile (backend/gradle.lockfile, frontend/pnpm-lock.yaml など) で、間接依存も含む。
+# - PR: ベースブランチと比べて新たに入る脆弱性があれば失敗する
+# - main への push と週次: 全件を GitHub の Code scanning (ツール名 osv-scanner) に登録する
+#   (既存の脆弱性で main を赤くしないよう、ここでは失敗させない)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # 毎週月曜 18:40 UTC (火曜 03:40 JST)。新しく公開された脆弱性を拾う
+    - cron: '40 18 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  osv-pr:
+    name: OSV-Scanner (new vulnerabilities)
+    if: github.event_name == 'pull_request'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+
+  osv-full:
+    name: OSV-Scanner (full report)
+    if: github.event_name != 'pull_request'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+    with:
+      fail-on-vuln: false
