@@ -49,7 +49,7 @@ jobs:
       - name: Scan lockfiles
         run: |
           set +e
-          /tmp/osv-scanner scan source --recursive --format sarif --output osv-scanner.sarif .
+          /tmp/osv-scanner scan source --recursive --format sarif --output-file osv-scanner.sarif .
           status=$?
           set -e
           if [ "$status" -ne 0 ] && [ "$status" -ne 1 ]; then
