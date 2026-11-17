@@ -152,3 +152,80 @@ describe('CSRF インターセプター: 非安全メソッド', () => {
     expect(receivedCsrfHeader).toBe('my-token')
   })
 })
+
+describe('リクエスト内容', () => {
+  afterEach(() => {
+    document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    document.cookie = 'OTHER=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  })
+
+  it('XSRF-TOKEN 以外のクッキーは CSRF トークンとして送らない', async () => {
+    const received: (string | null)[] = []
+    server.use(
+      http.post('/api/v1/auth/login', ({ request }) => {
+        received.push(request.headers.get('X-XSRF-TOKEN'))
+        return HttpResponse.json({ data: {} })
+      }),
+    )
+    document.cookie = 'OTHER=other-value'
+    await api.post('/auth/login', {})
+    document.cookie = 'XSRF-TOKEN=a%20token'
+    await api.post('/auth/login', {})
+    expect(received).toEqual([null, 'a token'])
+  })
+
+  it.each(['post', 'put', 'patch'] as const)('%s は JSON の body と Content-Type を送る', async (method) => {
+    let received: { contentType: string | null; body: unknown } | null = null
+    server.use(
+      http[method]('/api/v1/users/1', async ({ request }) => {
+        received = { contentType: request.headers.get('Content-Type'), body: await request.json() }
+        return HttpResponse.json({ data: {} })
+      }),
+    )
+    await api[method]('/users/1', { email: 'a@example.com' })
+    expect(received).toEqual({ contentType: 'application/json', body: { email: 'a@example.com' } })
+  })
+
+  it('値がすべて undefined のときは ? を付けない', async () => {
+    let receivedUrl: string | null = null
+    server.use(
+      http.get('/api/v1/users', ({ request }) => {
+        receivedUrl = request.url
+        return HttpResponse.json({ data: [] })
+      }),
+    )
+    await api.get('/users', { params: { page: undefined } })
+    expect(receivedUrl).toMatch(/\/api\/v1\/users$/)
+  })
+})
+
+describe('レスポンス処理 (詳細)', () => {
+  it('JSON 以外のレスポンスは undefined を返す', async () => {
+    server.use(
+      http.get('/api/v1/auth/me', () => HttpResponse.text('ok')),
+    )
+    await expect(api.get('/auth/me')).resolves.toBeUndefined()
+  })
+
+  it('HttpError の name は HttpError', async () => {
+    server.use(
+      http.get('/api/v1/auth/me', () => new HttpResponse(null, { status: 500 })),
+    )
+    const error = await api.get('/auth/me').catch((e: unknown) => e)
+    expect((error as HttpError).name).toBe('HttpError')
+  })
+
+  it('details は field と message が文字列の要素だけを残す', async () => {
+    const valid = { field: 'email', message: '不正です' }
+    server.use(
+      http.get('/api/v1/auth/me', () =>
+        HttpResponse.json(
+          { details: ['text', { message: 'no field' }, { field: 'f', message: 1 }, { field: 'f' }, valid] },
+          { status: 400 },
+        ),
+      ),
+    )
+    const error = await api.get('/auth/me').catch((e: unknown) => e)
+    expect((error as HttpError).details).toEqual([valid])
+  })
+})

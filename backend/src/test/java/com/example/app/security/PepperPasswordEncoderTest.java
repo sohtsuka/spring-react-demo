@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
@@ -66,8 +69,52 @@ class PepperPasswordEncoderTest {
 
     @Test
     void upgradeEncoding_withNoDelimiter_returnsFalse() {
+        given(delegate.upgradeEncoding(anyString())).willReturn(true);
+
         boolean result = encoder.upgradeEncoding("noDelimiterHere");
 
         assertThat(result).isFalse();
+    }
+
+    @Test
+    void encode_usesFreshRandomSaltAndPassesPepperSaltPasswordToDelegate() {
+        given(delegate.encode(anyString())).willReturn("delegateHash");
+
+        String first = encoder.encode("myPassword");
+        String second = encoder.encode("myPassword");
+
+        String salt = first.split(":", 2)[0];
+        byte[] saltBytes = Base64.getDecoder().decode(salt);
+        assertThat(saltBytes).hasSize(32).isNotEqualTo(new byte[32]);
+        assertThat(second.split(":", 2)[0]).isNotEqualTo(salt);
+        verify(delegate).encode("testPepper" + salt + "myPassword");
+    }
+
+    @Test
+    void matches_passesPepperSaltPasswordAndHashToDelegate() {
+        given(delegate.matches("testPepperSALTmyPassword", "hash:part")).willReturn(true);
+
+        assertThat(encoder.matches("myPassword", "SALT:hash:part")).isTrue();
+    }
+
+    @Test
+    void matches_withDelimiterAtStart_usesEmptySalt() {
+        given(delegate.matches("testPepperpw", "hash")).willReturn(true);
+
+        assertThat(encoder.matches("pw", ":hash")).isTrue();
+    }
+
+    @Test
+    void upgradeEncoding_withDelimiterAtStart_delegatesToInner() {
+        given(delegate.upgradeEncoding("hash")).willReturn(true);
+
+        assertThat(encoder.upgradeEncoding(":hash")).isTrue();
+    }
+
+    @Test
+    void upgradeEncoding_whenDelegateSaysNo_returnsFalse() {
+        given(delegate.upgradeEncoding("delegateHash")).willReturn(false);
+
+        assertThat(encoder.upgradeEncoding("appSalt:delegateHash")).isFalse();
     }
 }

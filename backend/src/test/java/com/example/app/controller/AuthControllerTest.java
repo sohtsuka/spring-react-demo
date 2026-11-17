@@ -30,6 +30,7 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -138,12 +139,20 @@ class AuthControllerTest {
     }
 
     @Test
-    void logout_withSession_invalidatesSession() throws Exception {
+    void logout_withSession_invalidatesSessionAndClearsSecurityContext() throws Exception {
         MockHttpSession session = new MockHttpSession();
+        CustomUserDetails userDetails = new CustomUserDetails(buildUser());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
 
-        mockMvc.perform(post("/api/v1/auth/logout").session(session)).andExpect(status().isNoContent());
+        try {
+            mockMvc.perform(post("/api/v1/auth/logout").session(session)).andExpect(status().isNoContent());
 
-        assertThat(session.isInvalid()).isTrue();
+            assertThat(session.isInvalid()).isTrue();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test
