@@ -23,7 +23,7 @@ export function useAuth() {
     mutationFn: (request: LoginRequest) => authApi.login(request),
     onSuccess: (data) => {
       queryClient.setQueryData(AUTH_QUERY_KEY, data)
-      navigate('/')
+      void navigate('/')
     },
   })
 
@@ -31,7 +31,7 @@ export function useAuth() {
     mutationFn: authApi.logout,
     onSuccess: () => {
       queryClient.clear()
-      navigate('/login')
+      void navigate('/login')
     },
   })
 

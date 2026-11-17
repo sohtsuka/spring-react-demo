@@ -18,7 +18,10 @@ pnpm install
 
 依存更新は Renovate と同じく公開から 7 日以上経過した GA 版を対象とします。
 `pnpm-workspace.yaml` の `minimumReleaseAge` でもこの制約を適用しています。
-TypeScript は typescript-eslint の対応範囲 (`<6.1.0`) に合わせて 6.0.3 を使用し、
+TypeScript はビルド (`tsc -b`) に 7.x (`@typescript/native` エイリアス) を使用します。
+TypeScript 7.0 には JS API がないため、`typescript` という名前には Microsoft 公式の互換パッケージ
+`@typescript/typescript6` を割り当て、TS API を使うツール (StrykerJS、エディタ) は 6.0 を使います。
+Lint は oxlint の型情報付きモード (`oxlint-tsgolint`) で行い、設定は `.oxlintrc.json` にあります。
 `@types/node` は実行環境と同じ 24 系を使用します。
 
 ## 開発サーバー起動

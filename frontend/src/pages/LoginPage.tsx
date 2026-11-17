@@ -31,7 +31,7 @@ export function LoginPage() {
   // すでに認証済みの場合はダッシュボードへ
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true })
+      void navigate('/', { replace: true })
     }
   }, [isAuthenticated, navigate])
 

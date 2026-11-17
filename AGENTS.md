@@ -29,7 +29,7 @@ This repository contains a Spring Boot API in `backend/` and a Vite React SPA in
 
 Backend targets Java 25 and uses Spotless with the Eclipse formatter, Checkstyle, and SpotBugs. Keep packages under `com.example.app`; use clear layer names such as `controller`, `service`, `repository`, and `model.dto`. Test classes should end in `Test`.
 
-Frontend uses TypeScript, React 19, ESLint, and pnpm. Use PascalCase for React components and pages, camelCase for functions and hooks, and keep shadcn-style UI primitives in `src/components/ui`.
+Frontend uses TypeScript 7 (`tsc` from the `@typescript/native` alias; `typescript` is aliased to `@typescript/typescript6` for tools that need the TS API, such as StrykerJS), React 19, oxlint with type-aware rules (`.oxlintrc.json`), and pnpm. Use PascalCase for React components and pages, camelCase for functions and hooks, and keep shadcn-style UI primitives in `src/components/ui`.
 
 ## Testing Guidelines
 
