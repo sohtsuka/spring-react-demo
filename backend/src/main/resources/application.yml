@@ -2,7 +2,8 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/appdb}
     username: ${DB_USERNAME:appuser}
-    password: ${DB_PASSWORD:apppassword}
+    # 本番では必須 (既定値を置かない)。開発用の既定値は application-dev.yml にある
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   flyway:

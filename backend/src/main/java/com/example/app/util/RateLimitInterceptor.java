@@ -10,13 +10,17 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import io.github.bucket4j.TimeMeter;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import com.example.app.exception.ErrorCode;
@@ -27,7 +31,20 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     private static final int MAX_REQUESTS_PER_MINUTE = 60;
 
+    /** 個別のバケットを持つクライアント IP の上限。超えた分は {@link #overflowBucket} を共有する。 */
+    static final int MAX_TRACKED_CLIENTS = 10_000;
+
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final int maxTrackedClients;
+    private final TimeMeter timeMeter;
+    /**
+     * 追跡上限を超えた新しい IP が共有するバケット。
+     *
+     * <p>
+     * IP を次々に変える攻撃 (IPv6 の大きなアドレス空間など) で {@link #buckets} が際限なく増え、
+     * メモリを使い切るのを防ぐ。上限に達している間の新しい IP はまとめて 1 つの枠で制限する。
+     */
+    private final Bucket overflowBucket;
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     /**
@@ -40,15 +57,24 @@ public class RateLimitInterceptor implements HandlerInterceptor {
      */
     private final int trustedProxyCount;
 
+    @Autowired
     public RateLimitInterceptor(@Value("${app.security.trusted-proxy-count:0}") int trustedProxyCount) {
+        this(trustedProxyCount, MAX_TRACKED_CLIENTS, TimeMeter.SYSTEM_MILLISECONDS);
+    }
+
+    RateLimitInterceptor(int trustedProxyCount, int maxTrackedClients, TimeMeter timeMeter) {
+        Assert.isTrue(maxTrackedClients > 0, "maxTrackedClients must be positive");
         this.trustedProxyCount = trustedProxyCount;
+        this.maxTrackedClients = maxTrackedClients;
+        this.timeMeter = timeMeter;
+        this.overflowBucket = newBucket();
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
         String ip = resolveClientIp(request);
-        Bucket bucket = buckets.computeIfAbsent(ip, this::newBucket);
+        Bucket bucket = bucketFor(ip);
 
         if (bucket.tryConsume(1)) {
             return true;
@@ -62,10 +88,38 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return false;
     }
 
-    private Bucket newBucket(String ip) {
+    /**
+     * 満杯まで回復したバケットを捨てる。
+     *
+     * <p>
+     * 満杯のバケットは新しく作るバケットと同じ状態なので、捨てても制限の結果は変わらない。
+     * 最後のリクエストから 1 分ほどで満杯に戻るため、アクセスの止んだ IP は次の掃除で消える。
+     */
+    @Scheduled(fixedDelay = 60_000)
+    public void evictIdleBuckets() {
+        buckets.values().removeIf(bucket -> bucket.getAvailableTokens() >= MAX_REQUESTS_PER_MINUTE);
+    }
+
+    int trackedClientCount() {
+        return buckets.size();
+    }
+
+    private Bucket bucketFor(String ip) {
+        Bucket existing = buckets.get(ip);
+        if (existing != null) {
+            return existing;
+        }
+        // 並行した追加でわずかに上限を超えることはあるが、増え続けることはない
+        if (buckets.size() >= maxTrackedClients) {
+            return overflowBucket;
+        }
+        return buckets.computeIfAbsent(ip, ignored -> newBucket());
+    }
+
+    private Bucket newBucket() {
         Bandwidth limit = Bandwidth.builder().capacity(MAX_REQUESTS_PER_MINUTE)
                 .refillGreedy(MAX_REQUESTS_PER_MINUTE, Duration.ofMinutes(1)).build();
-        return Bucket.builder().addLimit(limit).build();
+        return Bucket.builder().withCustomTimePrecision(timeMeter).addLimit(limit).build();
     }
 
     /**

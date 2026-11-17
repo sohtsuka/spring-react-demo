@@ -202,7 +202,7 @@ osv-scanner scan source -r .
 |---|---|---|
 | `DB_URL` | `jdbc:postgresql://localhost:5432/appdb` | DB 接続 URL |
 | `DB_USERNAME` | `appuser` | DB ユーザー名 |
-| `DB_PASSWORD` | `apppassword` | DB パスワード |
+| `DB_PASSWORD` | `apppassword`（`dev` プロファイルのみ） | DB パスワード。`dev` 以外では未設定だと起動しない |
 | `SESSION_TIMEOUT` | `1800` | セッションタイムアウト (秒) |
 
 ## 運用時の契約
