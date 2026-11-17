@@ -130,9 +130,20 @@ public class SecurityConfig {
         return new HttpSessionSecurityContextRepository();
     }
 
+    /**
+     * CSRF トークンの cookie。SPA が読むため HttpOnly は付けない。
+     *
+     * <p>
+     * Secure の既定はリクエストが HTTPS かどうかで決まるが、本番は nginx が TLS を終端して HTTP で
+     * 転送するため付かない。セッション cookie と同じ設定値に合わせ、SameSite も明示する。
+     */
     @Bean
-    public CookieCsrfTokenRepository csrfTokenRepository() {
-        return CookieCsrfTokenRepository.withHttpOnlyFalse();
+    public CookieCsrfTokenRepository csrfTokenRepository(
+            @Value("${server.servlet.session.cookie.secure:true}") boolean secureCookie,
+            @Value("${server.servlet.session.cookie.same-site:lax}") String sameSite) {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie.secure(secureCookie).sameSite(sameSite));
+        return repository;
     }
 
     @Bean

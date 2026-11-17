@@ -1,5 +1,6 @@
 package com.example.app.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -78,6 +79,9 @@ class SecurityConfigIntegrationTest {
         MockHttpSession second = (MockHttpSession) secondLogin.getRequest().getSession(false);
         var csrf = java.util.Arrays.stream(secondLogin.getResponse().getCookies())
                 .filter(cookie -> cookie.getName().equals("XSRF-TOKEN")).reduce((previous, next) -> next).orElseThrow();
+        // TLS を前段で終端する本番構成でも、セッション cookie と同じ属性が付く
+        assertThat(csrf.getSecure()).isTrue();
+        assertThat(csrf.getAttribute("SameSite")).isEqualToIgnoringCase("lax");
         mockMvc.perform(post("/api/v1/online-batch-jobs").session(second).cookie(csrf)
                 .header("X-XSRF-TOKEN", csrf.getValue()).contentType("application/json")
                 .content("{\"jobName\":\"login-control\",\"totalItems\":1,\"processingDelayMs\":0}"))
