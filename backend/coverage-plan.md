@@ -70,10 +70,10 @@ recordLoginFailure_userNotFound_doesNothing
 
 ```
 login_withLockedAccount_returns401
-  → authenticate が LockedException をスロー → ACCOUNT_LOCKED (401)
+  → authenticate が LockedException をスロー → INVALID_CREDENTIALS (401)
 
 login_withDisabledAccount_returns401
-  → authenticate が DisabledException をスロー → ACCOUNT_DISABLED (401)
+  → authenticate が DisabledException をスロー → INVALID_CREDENTIALS (401)
 
 login_withExistingSession_invalidatesOldSession
   → MockMvc の SessionRepositoryRequestCache 等で既存セッションを持たせた状態でログイン

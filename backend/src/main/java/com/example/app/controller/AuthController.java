@@ -51,10 +51,10 @@ public class AuthController {
         try {
             auth = authenticationManager
                     .authenticate(new UsernamePasswordAuthenticationToken(request.username(), request.password()));
-        } catch (LockedException ex) {
-            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
-        } catch (DisabledException ex) {
-            throw new AppException(ErrorCode.ACCOUNT_DISABLED);
+        } catch (LockedException | DisabledException ex) {
+            // ロック・無効化を区別して返すと、アカウントの存在や状態を第三者に知られてしまう。
+            // 認証失敗と同じ応答にする (失敗回数は数えない。ロック中の失敗でロックを延長させないため)
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
         } catch (BadCredentialsException ex) {
             userService.recordLoginFailure(request.username());
             throw new AppException(ErrorCode.INVALID_CREDENTIALS);
