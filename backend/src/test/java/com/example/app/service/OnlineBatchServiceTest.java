@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -262,6 +263,156 @@ class OnlineBatchServiceTest {
         }
     }
 
+    @Test
+    void start_returnsAcceptedJobWithInitialState() {
+        OnlineBatchJobResponse accepted = onlineBatchService.start(1L,
+                new StartOnlineBatchRequest("受付確認", 3, null, 60_000));
+
+        assertThat(accepted.jobName()).isEqualTo("受付確認");
+        assertThat(accepted.status()).isEqualTo(BatchJobStatus.ACCEPTED);
+        assertThat(accepted.totalItems()).isEqualTo(3);
+        assertThat(accepted.recentEvents()).singleElement().asString().endsWith(" ジョブを受け付けました");
+    }
+
+    @Test
+    void process_persistsEachStepInOrder() throws Exception {
+        Long id = onlineBatchService.start(1L, new StartOnlineBatchRequest("段階保存", 1, null, 0)).id();
+        waitUntilFinished(id);
+
+        List<OnlineBatchJob> updates = onlineBatchJobRepository.updates;
+        assertThat(updates).hasSize(4);
+
+        OnlineBatchJob running = updates.get(0);
+        assertThat(running.getStatus()).isEqualTo(BatchJobStatus.RUNNING);
+        assertThat(running.getStartedAt()).isNotNull();
+        assertThat(firstEvent(running)).endsWith(" オンラインバッチを開始しました");
+
+        OnlineBatchJob started = updates.get(1);
+        assertThat(started.getCurrentItem()).isEqualTo("データ1/1");
+        assertThat(firstEvent(started)).endsWith(" データ1/1 の処理を開始しました");
+
+        OnlineBatchJob itemDone = updates.get(2);
+        assertThat(itemDone.getProcessedItems()).isEqualTo(1);
+        assertThat(itemDone.getSuccessCount()).isEqualTo(1);
+        assertThat(itemDone.getProgressPercent()).isEqualTo(100);
+        assertThat(firstEvent(itemDone)).endsWith(" データ1/1 の処理が完了しました");
+
+        OnlineBatchJob completed = updates.get(3);
+        assertThat(completed.getStatus()).isEqualTo(BatchJobStatus.COMPLETED);
+        assertThat(completed.getCurrentItem()).isNull();
+        assertThat(completed.getCompletedAt()).isNotNull();
+        assertThat(firstEvent(completed)).endsWith(" すべてのデータを処理しました");
+    }
+
+    @Test
+    void completedJob_keepsOnlyLatestEightEventsNewestFirst() throws Exception {
+        Long id = onlineBatchService.start(1L, new StartOnlineBatchRequest("履歴", 3, null, 0)).id();
+
+        OnlineBatchJobResponse completed = waitUntilFinished(id);
+
+        // 受付 + 開始 + 3件 x (開始, 完了) + 終了 = 9 件のうち新しい 8 件
+        assertThat(completed.processedItems()).isEqualTo(3);
+        assertThat(completed.startedAt()).isNotNull();
+        assertThat(completed.completedAt()).isNotNull();
+        assertThat(completed.recentEvents()).hasSize(8);
+        assertThat(completed.recentEvents().get(0)).endsWith(" すべてのデータを処理しました");
+        assertThat(completed.recentEvents().get(7)).endsWith(" オンラインバッチを開始しました");
+    }
+
+    @Test
+    void failedJob_recordsFailingItem() throws Exception {
+        Long id = onlineBatchService.start(1L, new StartOnlineBatchRequest("失敗詳細", 4, 2, 0)).id();
+
+        OnlineBatchJobResponse failed = waitUntilFinished(id);
+
+        assertThat(failed.processedItems()).isEqualTo(2);
+        assertThat(failed.currentItem()).isEqualTo("データ2/4");
+        assertThat(failed.completedAt()).isNotNull();
+        assertThat(failed.recentEvents().get(0)).endsWith(" データ2/4 でエラーが発生し、ジョブを停止しました");
+    }
+
+    @Test
+    void start_withFailureAtLastItem_isAccepted() throws Exception {
+        Long id = onlineBatchService.start(1L, new StartOnlineBatchRequest("最終件で失敗", 3, 3, 0)).id();
+
+        assertThat(waitUntilFinished(id).processedItems()).isEqualTo(3);
+    }
+
+    @Test
+    void shutdown_interruptsRunningJobAndStopsAdmission() throws Exception {
+        BatchAdmission admission = new BatchAdmission(100, 100, 1000, 1000);
+        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(onlineBatchJobRepository,
+                Executors.newVirtualThreadPerTaskExecutor(), JsonMapper.builder().build(), admission,
+                TransactionOperations.withoutTransaction(), 7, 1000);
+        Long id = service.start(1L, new StartOnlineBatchRequest("中断", 1, null, 60_000)).id();
+        for (int i = 0; i < 100 && onlineBatchJobRepository.updates.size() < 2; i++) {
+            Thread.sleep(10);
+        }
+
+        service.shutdown();
+        OnlineBatchJobResponse interrupted = waitUntilFinished(id);
+
+        assertThat(interrupted.status()).isEqualTo(BatchJobStatus.FAILED);
+        assertThat(interrupted.completedAt()).isNotNull();
+        assertThat(interrupted.recentEvents().get(0)).endsWith(" ジョブが中断されました");
+        assertThatThrownBy(() -> admission.acquire(1L)).isInstanceOf(AppException.class);
+    }
+
+    @Test
+    void start_prunesHistoryToMakeRoomForNewJob() {
+        OnlineBatchServiceImpl service = new OnlineBatchServiceImpl(onlineBatchJobRepository, executor,
+                JsonMapper.builder().build(), new BatchAdmission(100, 100, 1000, 1000),
+                TransactionOperations.withoutTransaction(), 7, 2);
+        onlineBatchJobRepository.seedJob(job -> {
+            job.setStatus(BatchJobStatus.COMPLETED);
+            job.setCreatedAt(LocalDateTime.now().minusMinutes(2));
+        });
+        onlineBatchJobRepository.seedJob(job -> {
+            job.setStatus(BatchJobStatus.COMPLETED);
+            job.setCreatedAt(LocalDateTime.now().minusMinutes(1));
+        });
+
+        service.start(1L, new StartOnlineBatchRequest("追加", 1, null, 60_000));
+
+        assertThat(onlineBatchJobRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void recoverInterrupted_alsoRemovesExpiredHistory() {
+        Long expired = onlineBatchJobRepository.seedJob(job -> {
+            job.setStatus(BatchJobStatus.COMPLETED);
+            job.setCompletedAt(LocalDateTime.now().minusDays(8));
+        });
+        Long recent = onlineBatchJobRepository.seedJob(job -> {
+            job.setStatus(BatchJobStatus.COMPLETED);
+            job.setCompletedAt(LocalDateTime.now().minusDays(6));
+        });
+
+        onlineBatchService.recoverInterrupted();
+
+        assertThatThrownBy(() -> onlineBatchService.findById(expired)).isInstanceOf(AppException.class);
+        assertThat(onlineBatchService.findById(recent)).isNotNull();
+    }
+
+    @Test
+    void findAll_usesPageOffset() {
+        for (int i = 5; i >= 1; i--) {
+            int minutesAgo = i;
+            onlineBatchJobRepository.seedJob(job -> {
+                job.setJobName("job" + minutesAgo);
+                job.setCreatedAt(LocalDateTime.now().minusMinutes(minutesAgo));
+            });
+        }
+
+        var page = onlineBatchService.findAll(3, 2);
+
+        assertThat(page.data()).extracting(OnlineBatchJobResponse::jobName).containsExactly("job5");
+    }
+
+    private static String firstEvent(OnlineBatchJob job) throws Exception {
+        return JsonMapper.builder().build().readTree(job.getRecentEvents()).get(0).asString();
+    }
+
     private OnlineBatchJobResponse waitUntilFinished(Long jobId) throws Exception {
         for (int i = 0; i < 100; i++) {
             OnlineBatchJobResponse response = onlineBatchService.findById(jobId);
@@ -278,6 +429,7 @@ class OnlineBatchServiceTest {
         private final AtomicLong sequence = new AtomicLong(0);
         private final AtomicBoolean failNextUpdate = new AtomicBoolean();
         private final AtomicBoolean failNextRecovery = new AtomicBoolean();
+        private final List<OnlineBatchJob> updates = new CopyOnWriteArrayList<>();
 
         @Override
         public void failIncomplete(Long id, String events) {
@@ -348,6 +500,7 @@ class OnlineBatchServiceTest {
             OnlineBatchJob copy = copy(job);
             copy.setUpdatedAt(LocalDateTime.now());
             store.put(copy.getId(), copy);
+            updates.add(copy(copy));
         }
 
         Long seedJob(java.util.function.Consumer<OnlineBatchJob> customizer) {

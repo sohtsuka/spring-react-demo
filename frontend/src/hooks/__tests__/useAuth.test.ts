@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 import { mockAuthUser } from '@/test/mockUser'
@@ -13,8 +13,12 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return React.createElement(
     QueryClientProvider,
     { client: qc },
-    React.createElement(MemoryRouter, null, children),
+    React.createElement(MemoryRouter, { initialEntries: ['/start'] }, children),
   )
+}
+
+function useAuthWithLocation() {
+  return { auth: useAuth(), pathname: useLocation().pathname }
 }
 
 describe('useAuth', () => {
@@ -83,5 +87,40 @@ describe('useAuth', () => {
     await waitFor(() => expect(result.current.isLoggingIn).toBe(true))
     resolveLogin?.()
     await waitFor(() => expect(result.current.isLoggingIn).toBe(false))
+  })
+
+  it('login 成功: 未ログイン状態から user をセットしてトップへ遷移する', async () => {
+    server.use(
+      http.get('/api/v1/auth/me', () => new HttpResponse(null, { status: 401 })),
+    )
+    const { result } = renderHook(() => useAuthWithLocation(), { wrapper })
+    await waitFor(() => expect(result.current.auth.isLoading).toBe(false))
+    expect(result.current.auth.user).toBeUndefined()
+
+    await act(async () => {
+      await result.current.auth.loginAsync({ username: 'user', password: 'pass' })
+    })
+
+    expect(result.current.auth.user).toEqual(mockAuthUser)
+    expect(result.current.pathname).toBe('/')
+  })
+
+  it('logout 成功: logout API を呼びログイン画面へ遷移する', async () => {
+    let logoutCalls = 0
+    server.use(
+      http.post('/api/v1/auth/logout', () => {
+        logoutCalls++
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const { result } = renderHook(() => useAuthWithLocation(), { wrapper })
+    await waitFor(() => expect(result.current.auth.isLoading).toBe(false))
+
+    await act(async () => {
+      result.current.auth.logout()
+    })
+
+    await waitFor(() => expect(result.current.pathname).toBe('/login'))
+    expect(logoutCalls).toBe(1)
   })
 })

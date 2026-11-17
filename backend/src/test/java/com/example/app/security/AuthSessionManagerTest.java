@@ -47,6 +47,7 @@ class AuthSessionManagerTest {
         old.setAttribute("untrusted", "value");
         var response = new MockHttpServletResponse();
         login(1, request, response);
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).isEqualTo(principal(1));
         assertThat(request.getSession().getId()).isNotEqualTo(old.getId());
         assertThat(request.getSession().getAttribute("untrusted")).isNull();
         assertThat(response.getCookie("XSRF-TOKEN").getValue()).isNotBlank();
