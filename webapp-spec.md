@@ -263,7 +263,7 @@ URL パターン:
 | 429 Too Many Requests | ログインのレート制限超過 |
 | 500 Internal Server Error | サーバー内部エラー |
 
-API クライアントはエラー本文の `code` / `message` / `details` を `HttpError` に保持する。ログイン画面は `401 + ACCOUNT_LOCKED` でロックの案内を表示し、`401 + ACCOUNT_DISABLED` と `429 + RATE_LIMIT_EXCEEDED` では API のメッセージを表示する。その他の 401 は認証失敗として扱う。
+API クライアントはエラー本文の `code` / `message` / `details` を `HttpError` に保持する。ログイン API は認証失敗・アカウントロック・無効化をすべて `401 + INVALID_CREDENTIALS` の同じメッセージで返し、アカウントの有無や状態を区別できないようにする。ログイン画面は 401 を認証失敗として表示し、`429 + RATE_LIMIT_EXCEEDED` では API のメッセージを表示する。
 
 ### 5.4 バリデーション
 
@@ -486,6 +486,7 @@ public ResponseEntity<Void> deleteUser(@PathVariable Long id) { ... }
 
 - ログイン失敗 10 回連続でアカウントを一時ロック
 - ロック解除: 一定時間経過後に自動解除 (デフォルト 30 分)、または管理者による手動解除
+- ロック中・無効化中のログインは認証失敗と同じ応答にする (アカウントの存在や状態を推測させない)。ロック中の失敗は回数に数えない
 - `users` テーブルに `failed_login_attempts` / `locked_until` カラムを追加して管理
 - 対象ユーザーを行ロックしてから現在の失敗回数を読み、加算とロック判定を同じトランザクションで行う。並行した失敗でも 10 回到達時にロックする
 

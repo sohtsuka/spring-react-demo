@@ -9,8 +9,7 @@ import { LoginPage } from '../LoginPage'
 
 describe('ログイン API と画面のエラー契約', () => {
   it.each([
-    [401, 'ACCOUNT_LOCKED', 'アカウントがロックされています'],
-    [401, 'ACCOUNT_DISABLED', 'アカウントが無効化されています'],
+    [401, 'INVALID_CREDENTIALS', 'ユーザー名またはパスワードが正しくないか、アカウントがロックされています'],
     [429, 'RATE_LIMIT_EXCEEDED', 'リクエストが多すぎます'],
   ])('%i %s を画面に表示する', async (status, code, message) => {
     server.use(

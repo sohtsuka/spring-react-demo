@@ -2,7 +2,7 @@
 
 Vite + React + TypeScript による SPA フロントエンドです。
 
-APIのエラー本文は `HttpError` の `code` / `message` / `details` に保持します。ログイン画面はHTTPステータスとcodeを組み合わせ、401の `ACCOUNT_LOCKED` をロック案内、`ACCOUNT_DISABLED` を無効化の案内として表示します。429の `RATE_LIMIT_EXCEEDED` もAPIのメッセージを表示します。この契約はMSWでAPIクライアント・useAuth・LoginPageを通して検証します。
+APIのエラー本文は `HttpError` の `code` / `message` / `details` に保持します。ログイン画面は401を一律に「ユーザー名またはパスワードが正しくないか、アカウントがロックされています」と表示します（APIは認証失敗・ロック・無効化を区別しません）。429の `RATE_LIMIT_EXCEEDED` はAPIのメッセージを表示します。この契約はMSWでAPIクライアント・useAuth・LoginPageを通して検証します。
 
 ## 前提条件
 

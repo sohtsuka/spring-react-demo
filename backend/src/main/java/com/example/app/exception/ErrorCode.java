@@ -5,11 +5,9 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     // 認証・認可
-    INVALID_CREDENTIALS("INVALID_CREDENTIALS", "ユーザー名またはパスワードが正しくありません", HttpStatus.UNAUTHORIZED), ACCOUNT_LOCKED(
-            "ACCOUNT_LOCKED", "アカウントがロックされています。しばらく待ってから再試行してください",
-            HttpStatus.UNAUTHORIZED), ACCOUNT_DISABLED("ACCOUNT_DISABLED", "アカウントが無効化されています",
-                    HttpStatus.UNAUTHORIZED), UNAUTHORIZED("UNAUTHORIZED", "認証が必要です",
-                            HttpStatus.UNAUTHORIZED), FORBIDDEN("FORBIDDEN", "この操作を行う権限がありません", HttpStatus.FORBIDDEN),
+    INVALID_CREDENTIALS("INVALID_CREDENTIALS", "ユーザー名またはパスワードが正しくないか、アカウントがロックされています",
+            HttpStatus.UNAUTHORIZED), UNAUTHORIZED("UNAUTHORIZED", "認証が必要です",
+                    HttpStatus.UNAUTHORIZED), FORBIDDEN("FORBIDDEN", "この操作を行う権限がありません", HttpStatus.FORBIDDEN),
 
     // リソース
     USER_NOT_FOUND("USER_NOT_FOUND", "ユーザーが見つかりません", HttpStatus.NOT_FOUND), BATCH_JOB_NOT_FOUND("BATCH_JOB_NOT_FOUND",
