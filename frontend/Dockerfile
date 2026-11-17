@@ -1,6 +1,6 @@
 # 本番構成の SPA イメージ。dist をビルドし、nginx で配信する。
 
-FROM docker.io/library/node:24-alpine AS build
+FROM docker.io/library/node:26-alpine AS build
 WORKDIR /build
 ENV CI=true
 
