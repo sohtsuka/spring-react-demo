@@ -142,3 +142,7 @@ vite.config.ts.timestamp-*
 playwright-report/
 test-results/
 
+
+# Mutation testing (StrykerJS)
+reports/
+.stryker-tmp/
