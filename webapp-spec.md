@@ -530,6 +530,7 @@ Spring Security の `headers()` 設定で以下のヘッダーを全レスポン
 - ログインエンドポイント (`/api/v1/auth/login`) に対してレート制限を設ける
 - 実装: Bucket4j + Spring の `HandlerInterceptor` を使用
 - 同一 IP アドレスからのリクエストを一定時間内に制限 (例: 10 回 / 分)
+- IP ごとのバケットは満杯に戻ったものを定期的に破棄し、追跡数に上限を設ける。上限を超えた新しい IP は共有の 1 バケットで制限する (IP を変え続ける攻撃でメモリを使い切らせない)
 
 ### 8.6 依存ライブラリの脆弱性管理
 
@@ -590,7 +591,7 @@ volumes:
 |---|---|---|
 | `DB_URL` | `jdbc:postgresql://localhost:5432/appdb` | DB 接続 URL |
 | `DB_USERNAME` | `appuser` | DB ユーザー名 |
-| `DB_PASSWORD` | `apppassword` | DB パスワード |
+| `DB_PASSWORD` | `apppassword`（`dev` プロファイルのみ） | DB パスワード。`dev` 以外では未設定だと起動しない |
 | `SESSION_TIMEOUT` | `1800` | セッションタイムアウト秒数 |
 
 ### 9.5 起動手順

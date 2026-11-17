@@ -1,7 +1,12 @@
 package com.example.app.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicLong;
+
+import io.github.bucket4j.TimeMeter;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -166,5 +171,86 @@ class RateLimitInterceptorTest {
         boolean result = interceptor.preHandle(request, response, new Object());
 
         assertThat(result).isTrue();
+    }
+
+    @Test
+    void evictIdleBuckets_removesOnlyFullyRefilledBuckets() throws Exception {
+        FakeTimeMeter time = new FakeTimeMeter();
+        RateLimitInterceptor interceptor = new RateLimitInterceptor(0, 100, time);
+
+        assertThat(interceptor.preHandle(request("10.0.1.1"), new MockHttpServletResponse(), new Object())).isTrue();
+        assertThat(interceptor.preHandle(request("10.0.1.2"), new MockHttpServletResponse(), new Object())).isTrue();
+        assertThat(interceptor.trackedClientCount()).isEqualTo(2);
+
+        // 使用直後は満杯でないので残る
+        interceptor.evictIdleBuckets();
+        assertThat(interceptor.trackedClientCount()).isEqualTo(2);
+
+        // 1 分経つと満杯に戻るので消える。片方だけ使い直すと、そちらは残る
+        time.advance(Duration.ofMinutes(1));
+        assertThat(interceptor.preHandle(request("10.0.1.2"), new MockHttpServletResponse(), new Object())).isTrue();
+        interceptor.evictIdleBuckets();
+        assertThat(interceptor.trackedClientCount()).isEqualTo(1);
+    }
+
+    @Test
+    void evictIdleBuckets_keepsExhaustedBucketLimited() throws Exception {
+        FakeTimeMeter time = new FakeTimeMeter();
+        RateLimitInterceptor interceptor = new RateLimitInterceptor(0, 100, time);
+        MockHttpServletRequest request = request("10.0.2.1");
+
+        assertThat(isRateLimited(interceptor, request)).isTrue();
+        interceptor.evictIdleBuckets();
+
+        // 掃除しても使い切った状態は消えず、制限が続く
+        assertThat(interceptor.preHandle(request, new MockHttpServletResponse(), new Object())).isFalse();
+    }
+
+    @Test
+    void preHandle_whenTrackedClientLimitReached_newClientsShareOverflowBucket() throws Exception {
+        RateLimitInterceptor interceptor = new RateLimitInterceptor(0, 2, new FakeTimeMeter());
+
+        assertThat(interceptor.preHandle(request("10.0.3.1"), new MockHttpServletResponse(), new Object())).isTrue();
+        assertThat(interceptor.preHandle(request("10.0.3.2"), new MockHttpServletResponse(), new Object())).isTrue();
+
+        // 上限を超えた新しい IP は追跡されず、1 つの共有バケットで合わせて 60 回まで
+        for (int i = 0; i < 60; i++) {
+            MockHttpServletRequest overflow = request("10.0.4." + i);
+            assertThat(interceptor.preHandle(overflow, new MockHttpServletResponse(), new Object())).isTrue();
+        }
+        assertThat(interceptor.preHandle(request("10.0.5.1"), new MockHttpServletResponse(), new Object())).isFalse();
+        assertThat(interceptor.trackedClientCount()).isEqualTo(2);
+
+        // 追跡中の IP は自分のバケットを使い続ける
+        assertThat(interceptor.preHandle(request("10.0.3.1"), new MockHttpServletResponse(), new Object())).isTrue();
+    }
+
+    @Test
+    void constructor_rejectsNonPositiveTrackedClientLimit() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new RateLimitInterceptor(0, 0, new FakeTimeMeter()));
+    }
+
+    private static MockHttpServletRequest request(String remoteAddr) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr(remoteAddr);
+        return request;
+    }
+
+    private static final class FakeTimeMeter implements TimeMeter {
+        private final AtomicLong nanos = new AtomicLong();
+
+        void advance(Duration duration) {
+            nanos.addAndGet(duration.toNanos());
+        }
+
+        @Override
+        public long currentTimeNanos() {
+            return nanos.get();
+        }
+
+        @Override
+        public boolean isWallClockBased() {
+            return false;
+        }
     }
 }
