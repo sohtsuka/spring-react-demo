@@ -1,0 +1,84 @@
+name: ZAP baseline
+
+# 本番構成 (compose.prod.yaml) を起動し、OWASP ZAP のベースラインスキャンで外から見た弱点を検査する。
+# ベースラインはクローラーで画面を辿り、応答を受動的に調べるだけで、攻撃リクエストは送らない
+# (セキュリティヘッダー、Cookie 属性、情報漏れ、混在コンテンツなど)。ログイン後の画面は対象外。
+# 結果は判定せず、レポートを成果物とジョブのサマリーに残す。月 1 回と手動で実行する。
+# サードパーティの Action は使わず、ZAP 公式イメージをダイジェスト固定で直接実行する。
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/zap-baseline.yaml'
+  schedule:
+    # 毎月 3 日 19:40 UTC (4 日 04:40 JST)
+    - cron: '40 19 3 * *'
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:20261103-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+  TARGET_URL: https://127.0.0.1:8443/
+
+jobs:
+  zap-baseline:
+    name: ZAP baseline scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Start production stack
+        run: docker compose -f compose.prod.yaml up -d --build --wait --wait-timeout 300
+
+      - name: Wait for HTTPS endpoint
+        run: |
+          for i in $(seq 1 60); do
+            if curl -ksf -o /dev/null "${TARGET_URL}"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::${TARGET_URL} did not respond"
+          docker compose -f compose.prod.yaml logs
+          exit 1
+
+      # 終了コード: 0 = 指摘なし、2 = 警告あり (-I で 0 扱い)、1 = FAIL ルールに該当、3 = スキャン自体の失敗。
+      # このワークフローは報告が目的なので、3 のときだけジョブを失敗させる。
+      - name: Run ZAP baseline
+        run: |
+          mkdir -p zap
+          chmod 777 zap
+          set +e
+          docker run --rm --network host -v "${PWD}/zap:/zap/wrk:rw" "${ZAP_IMAGE}" \
+            zap-baseline.py -t "${TARGET_URL}" -I -j \
+            -r report.html -w report.md -J report.json
+          status=$?
+          set -e
+          echo "ZAP exit code: ${status}"
+          if [ "$status" -eq 3 ]; then
+            echo "::error::ZAP baseline scan failed to run"
+            exit 1
+          fi
+          test -s zap/report.md
+          cat zap/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zap-baseline-report
+          path: zap/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Stop production stack
+        if: always()
+        run: docker compose -f compose.prod.yaml down -v
