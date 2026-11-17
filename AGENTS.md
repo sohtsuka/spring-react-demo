@@ -15,6 +15,7 @@ This repository contains a Spring Boot API in `backend/` and a Vite React SPA in
 - `cd frontend && pnpm build`: type-check and build production assets.
 - `cd frontend && pnpm lint && pnpm test`: run frontend linting and unit/component tests.
 - `cd frontend && pnpm e2e`: run Playwright tests after backend and frontend are running.
+- `cd backend && ./gradlew pitest` / `cd frontend && pnpm mutation`: run mutation tests (PIT / StrykerJS). They are slow, so CI runs them weekly and on demand in the `Mutation test` workflow; reports go to `backend/build/reports/pitest/` and `frontend/reports/mutation/`. Surviving mutants show behavior the tests execute but never assert.
 
 ## Language Runtime LTS Policy (Mandatory)
 

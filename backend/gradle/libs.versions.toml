@@ -11,6 +11,9 @@ checkstyle = "14.4.0"
 spotbugs = "4.10.4"
 spotbugsPlugin = "6.5.12"
 archunit = "1.5.1"
+pitest = "1.30.2"
+pitestJunit5Plugin = "1.2.3"
+pitestPlugin = "1.19.0"
 
 [libraries]
 spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
@@ -32,3 +35,4 @@ spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 dependency-management = { id = "io.spring.dependency-management", version.ref = "dependencyManagement" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 spotbugs-plugin = { id = "com.github.spotbugs", version.ref = "spotbugsPlugin" }
+pitest = { id = "info.solidsoft.pitest", version.ref = "pitestPlugin" }

@@ -6,6 +6,7 @@ plugins {
     id 'checkstyle'
     alias(libs.plugins.spotless)
     alias(libs.plugins.spotbugs.plugin)
+    alias(libs.plugins.pitest)
 }
 
 group = 'com.example'
@@ -169,6 +170,34 @@ jacocoTestCoverageVerification {
 }
 
 check.dependsOn jacocoTestCoverageVerification
+
+// ---------------------------------------------------------------------------
+// PIT — ミューテーションテスト (テストの検出力を測る)
+// 実行: ./gradlew pitest  → build/reports/pitest/index.html
+// 実行時間が長いため check には含めず、CI では mutation-test ワークフロー
+// (手動 / 週次) で実行する。
+// ---------------------------------------------------------------------------
+pitest {
+    pitestVersion = libs.versions.pitest.get()
+    junit5PluginVersion = libs.versions.pitestJunit5Plugin.get()
+    targetClasses = ['com.example.app.*']
+    // JaCoCo と同じ除外 (エントリポイント / CLI ツール)
+    excludedClasses = ['com.example.app.Application', 'com.example.app.util.PasswordHasher']
+    // Testcontainers を使う結合テストはミュータントごとの再実行が重いため除外し、
+    // 速いユニットテストだけで検出力を測る
+    excludedTestClasses = [
+        'com.example.app.ArchitectureTest',
+        'com.example.app.config.SecurityConfigIntegrationTest',
+        'com.example.app.repository.*'
+    ]
+    mutators = ['DEFAULTS']
+    threads = Runtime.runtime.availableProcessors()
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
+    exportLineCoverage = false
+    // 初回導入時はスコアの閾値を設けず、レポートで傾向を見る
+    mutationThreshold = 0
+}
 
 test {
     useJUnitPlatform()
