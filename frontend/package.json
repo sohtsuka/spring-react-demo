@@ -58,7 +58,7 @@
     "@vitest/coverage-v8": "5.0.5",
     "@vitest/ui": "5.0.5",
     "eslint-plugin-react-hooks": "7.1.1",
-    "jsdom": "30.1.1",
+    "jsdom": "31.0.1",
     "msw": "3.0.1",
     "oxlint": "1.93.0",
     "oxlint-tsgolint": "7.0.2006",
